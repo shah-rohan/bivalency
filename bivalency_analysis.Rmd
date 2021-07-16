@@ -88,7 +88,7 @@ metagene_plot = function(summ_df, ylims = NA, title = NA){
 
 First, we have to have a sense of how bivalency exists at all genes. To do this, we will plot metagenes of all genes for all samples.
 
-```{r all_genes_meta}
+```{r all_genes_meta, warning = FALSE}
 metagene_plot(metagene(naive, tss_range, consensusGenes), ylims = c(0,80), title = "Naive mESCs")
 metagene_plot(metagene(primed, tss_range, consensusGenes), ylims = c(0,80), title = "Primed mESCs")
 metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title = "NPCs")
@@ -96,7 +96,7 @@ metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title =
 
 We observe that there is a significant amount of bivalency (especially trans bivalency) at all genes from naive, primed, and NPC samples. Importantly, it seems that bivalency actually *increases* over time rather than decreasing. This is interesting. My next step is to identify the average amount of bivalency in each of these samples -- and that of all other modifications, while I'm at it.
 
-```{r all_genes_avgs, echo = FALSE}
+```{r all_genes_avgs}
 hmd_summary_precursor = naive_hmd %>% mutate(sample = "naive") %>% select(sample, k4:trans)
 hmd_summary_precursor = rbind(hmd_summary_precursor, (primed_hmd %>% mutate(sample = "primed") %>% select(sample, k4:trans)))
 hmd_summary_precursor = rbind(hmd_summary_precursor, (npc_hmd %>% mutate(sample = "npc") %>% select(sample, k4:trans)))
