@@ -131,4 +131,46 @@ bivalent_genes_25[["npc"]] = get_biv_genes(npc_hmd, 25)
 bivalent_genes_50[["npc"]] = get_biv_genes(npc_hmd, 50)
 ```
 
-As expected, the proportion of genes with the listed amount of bivalency decreases as we increase the threshold from 10% to 25% to 50%. 
+As expected, the proportion of genes with the listed amount of bivalency decreases as we increase the threshold from 10% to 25% to 50%. We now wish to watch the bivalent genes by each threshold in naive cells over the course of differentiation.
+
+```{r metagenes_naive_bivalent_tracking}
+metagene_plot(metagene(naive, tss_range, bivalent_genes_10[["naive"]]), title = "Naive cells at genes with trans bivalent >10% in naive")
+metagene_plot(metagene(primed, tss_range, bivalent_genes_10[["naive"]]), title = "Primed cells at genes with trans bivalent >10% in naive")
+metagene_plot(metagene(npc, tss_range, bivalent_genes_10[["naive"]]), title = "NPC cells at genes with trans bivalent >10% in naive")
+
+metagene_plot(metagene(naive, tss_range, bivalent_genes_25[["naive"]]), title = "Naive cells at genes with trans bivalent >25% in naive")
+metagene_plot(metagene(primed, tss_range, bivalent_genes_25[["naive"]]), title = "Primed cells at genes with trans bivalent >25% in naive")
+metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["naive"]]), title = "NPC cells at genes with trans bivalent >25% in naive")
+
+metagene_plot(metagene(naive, tss_range, bivalent_genes_50[["naive"]]), title = "Naive cells at genes with trans bivalent >50% in naive")
+metagene_plot(metagene(primed, tss_range, bivalent_genes_50[["naive"]]), title = "Primed cells at genes with trans bivalent >50% in naive")
+metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "NPC cells at genes with trans bivalent >50% in naive")
+```
+
+Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent. Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
+
+```{r naive_dominance_sectioning}
+naive_dominance = list()
+naive_hmd = naive_hmd %>% mutate(logratio = log(k27+1) - log(k4+1))
+naive_dominance[["k27"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
+naive_dominance[["k4"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
+naive_dominance[["mid"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
+```
+
+Overall, we see that with an $e^1$ ratio threshold (logratio 1), there are 1728 K27 dominant genes, 6335 K4 dominant genes, and 7704 neutral genes with a bivalency threshold of 25%. Of course, we now want to do metagene analysis.
+
+```{r naive_dominance_metagene}
+metagene_plot(metagene(naive, tss_range, naive_dominance[["k27"]]), title = "Naive cells at genes with trans bivalent >25% and K27 dominance in naive")
+metagene_plot(metagene(primed, tss_range, naive_dominance[["k27"]]), title = "Primed cells at genes with trans bivalent >25% and K27 dominance in naive")
+metagene_plot(metagene(npc, tss_range, naive_dominance[["k27"]]), title = "NPC cells at genes with trans bivalent >25% and K27 dominance in naive")
+
+metagene_plot(metagene(naive, tss_range, naive_dominance[["k4"]]), title = "Naive cells at genes with trans bivalent >25% and k4 dominance in naive")
+metagene_plot(metagene(primed, tss_range, naive_dominance[["k4"]]), title = "Primed cells at genes with trans bivalent >25% and k4 dominance in naive")
+metagene_plot(metagene(npc, tss_range, naive_dominance[["k4"]]), title = "NPC cells at genes with trans bivalent >25% and k4 dominance in naive")
+
+metagene_plot(metagene(naive, tss_range, naive_dominance[["mid"]]), title = "Naive cells at genes with trans bivalent >25% and mid dominance in naive")
+metagene_plot(metagene(primed, tss_range, naive_dominance[["mid"]]), title = "Primed cells at genes with trans bivalent >25% and mid dominance in naive")
+metagene_plot(metagene(npc, tss_range, naive_dominance[["mid"]]), title = "NPC cells at genes with trans bivalent >25% and mid dominance in naive")
+```
+
+Overwhelmingly, it again seems that across these bivalency dominance classes, bivalent genes remain bivalent.
