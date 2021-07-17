@@ -18,6 +18,7 @@ This R Markdown file is meant to streamline the analysis of the bivalency data a
 This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries.
 
 ```{r data_loader}
+
 library(tidyverse)
 library(sleuth)
 
@@ -51,11 +52,13 @@ npc_hmd$trans = npc$trans %>% select(X0:X400) %>% rowMeans
 npc_hmd$Gene = as.character(npc_hmd$Gene)
 
 tss_range = seq(-3, 3, by = 0.05)
+
 ```
 
 The next chunk loads in functions to make metagenes.
 
 ```{r metagene_functions}
+
 get_biv_genes = function(dataset, threshold){
   genes = (dataset %>% filter(trans > threshold))$Gene
   return(genes)
@@ -82,6 +85,7 @@ metagene_plot = function(summ_df, ylims = NA, title = NA){
   
   print(plot_summary)
 }
+
 ```
 
 ## First-Pass HMD Metagene Analysis
@@ -89,14 +93,17 @@ metagene_plot = function(summ_df, ylims = NA, title = NA){
 First, we have to have a sense of how bivalency exists at all genes. To do this, we will plot metagenes of all genes for all samples.
 
 ```{r all_genes_meta, warning = FALSE}
+
 metagene_plot(metagene(naive, tss_range, consensusGenes), ylims = c(0,80), title = "Naive mESCs")
 metagene_plot(metagene(primed, tss_range, consensusGenes), ylims = c(0,80), title = "Primed mESCs")
 metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title = "NPCs")
+
 ```
 
 We observe that there is a significant amount of bivalency (especially trans bivalency) at all genes from naive, primed, and NPC samples. Importantly, it seems that bivalency actually *increases* over time rather than decreasing. This is interesting. My next step is to identify the average amount of bivalency in each of these samples -- and that of all other modifications, while I'm at it.
 
 ```{r all_genes_avgs}
+
 hmd_summary_precursor = naive_hmd %>% mutate(sample = "naive") %>% select(sample, k4:trans)
 hmd_summary_precursor = rbind(hmd_summary_precursor, (primed_hmd %>% mutate(sample = "primed") %>% select(sample, k4:trans)))
 hmd_summary_precursor = rbind(hmd_summary_precursor, (npc_hmd %>% mutate(sample = "npc") %>% select(sample, k4:trans)))
@@ -109,11 +116,13 @@ hmd_summary_all_genes = hmd_summary_precursor %>% group_by(sample) %>% summarize
 print("HMD Summary Median")
 print(hmd_summary_all_genes)
 rm(hmd_summary_precursor, hmd_summary_all_genes)
+
 ```
 
 Both by mean and median, we see that bivalency again increases from naive to primed to npc, with median trans HMDs of approximately 20%, 40%, and 30%, respectively. This means it will be somewhat difficult to identify genes that are truly "bivalent," so we're goign to go with initial thresholds of 10%, 25%, and 50%. We will load these all into lists for the sake of ease just to make it easier to handle them in the future.
 
 ```{r bivalent_thresholding}
+
 bivalent_genes_10 = list()
 bivalent_genes_25 = list()
 bivalent_genes_50 = list()
@@ -129,11 +138,13 @@ bivalent_genes_50[["primed"]] = get_biv_genes(primed_hmd, 50)
 bivalent_genes_10[["npc"]] = get_biv_genes(npc_hmd, 10)
 bivalent_genes_25[["npc"]] = get_biv_genes(npc_hmd, 25)
 bivalent_genes_50[["npc"]] = get_biv_genes(npc_hmd, 50)
+
 ```
 
 As expected, the proportion of genes with the listed amount of bivalency decreases as we increase the threshold from 10% to 25% to 50%. We now wish to watch the bivalent genes by each threshold in naive cells over the course of differentiation.
 
 ```{r metagenes_naive_bivalent_tracking}
+
 metagene_plot(metagene(naive, tss_range, bivalent_genes_10[["naive"]]), title = "Naive cells at genes with trans bivalent >10% in naive")
 metagene_plot(metagene(primed, tss_range, bivalent_genes_10[["naive"]]), title = "Primed cells at genes with trans bivalent >10% in naive")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_10[["naive"]]), title = "NPC cells at genes with trans bivalent >10% in naive")
@@ -145,21 +156,25 @@ metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["naive"]]), title = "N
 metagene_plot(metagene(naive, tss_range, bivalent_genes_50[["naive"]]), title = "Naive cells at genes with trans bivalent >50% in naive")
 metagene_plot(metagene(primed, tss_range, bivalent_genes_50[["naive"]]), title = "Primed cells at genes with trans bivalent >50% in naive")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "NPC cells at genes with trans bivalent >50% in naive")
+
 ```
 
 Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent. Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
 
 ```{r naive_dominance_sectioning}
+
 naive_dominance = list()
 naive_hmd = naive_hmd %>% mutate(logratio = log(k27+1) - log(k4+1))
 naive_dominance[["k27"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
 naive_dominance[["k4"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
 naive_dominance[["mid"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
+
 ```
 
 Overall, we see that with an $e^1$ ratio threshold (logratio 1), there are 1728 K27 dominant genes, 6335 K4 dominant genes, and 7704 neutral genes with a bivalency threshold of 25%. Of course, we now want to do metagene analysis.
 
 ```{r naive_dominance_metagene}
+
 metagene_plot(metagene(naive, tss_range, naive_dominance[["k27"]]), title = "Naive cells at genes with trans bivalent >25% and K27 dominance in naive")
 metagene_plot(metagene(primed, tss_range, naive_dominance[["k27"]]), title = "Primed cells at genes with trans bivalent >25% and K27 dominance in naive")
 metagene_plot(metagene(npc, tss_range, naive_dominance[["k27"]]), title = "NPC cells at genes with trans bivalent >25% and K27 dominance in naive")
@@ -171,6 +186,61 @@ metagene_plot(metagene(npc, tss_range, naive_dominance[["k4"]]), title = "NPC ce
 metagene_plot(metagene(naive, tss_range, naive_dominance[["mid"]]), title = "Naive cells at genes with trans bivalent >25% and mid dominance in naive")
 metagene_plot(metagene(primed, tss_range, naive_dominance[["mid"]]), title = "Primed cells at genes with trans bivalent >25% and mid dominance in naive")
 metagene_plot(metagene(npc, tss_range, naive_dominance[["mid"]]), title = "NPC cells at genes with trans bivalent >25% and mid dominance in naive")
+
 ```
 
 Overwhelmingly, it again seems that across these bivalency dominance classes, bivalent genes remain bivalent.
+
+
+## Gene Ontology Setup
+
+My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
+
+```{r gene_ontology_setup}
+
+library(biomaRt)
+library(tidyverse)
+
+ensembl = useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
+attributes = listAttributes(ensembl)
+filters = listFilters(ensembl)
+
+go_refseq_mrna = getBM(attributes = c('refseq_mrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = 'with_refseq_mrna', values = TRUE, mart = ensembl)
+
+go_refseq_ncrna = getBM(attributes = c('refseq_ncrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = c('with_refseq_mrna', 'with_refseq_ncrna'), values = list(FALSE, TRUE), mart = ensembl)
+
+colnames(go_refseq_mrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
+colnames(go_refseq_ncrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
+refseq_ensembl_external_go = rbind(go_refseq_mrna, go_refseq_ncrna) %>% filter(refseq_id != "") %>% filter(go_id != "")
+
+refseq_with_go = refseq_ensembl_external_go$refseq_id %>% unique
+ensembl_with_go = refseq_ensembl_external_go$ensembl_gene_id %>% unique
+genename_with_go = (refseq_ensembl_external_go %>% filter(external_gene_name != ""))$external_gene_name %>% unique
+
+rm(ensembl, attributes, filters, go_refseq_mrna, go_refseq_ncrna)
+
+```
+
+We now have GO ids for Refseq, Ensembl, and external gene names in M. musculus. The next thing to do is to assemble lists of the GO terms for each class of genes that we will be interested in.
+
+First, we will want to get GO terms and their offspring for developmental processes, embryo development, and maintenance of pluripotency. Then, we will examine the metabolic processes. As a negative control, so to speak, we will also pull out terms for immune system processes. Finally, we will get GO terms for neurodevelopmental processes, as these genes should be "turned on" over differentiation to NPCs.
+
+```{r go_offspring}
+
+library(GO.db)
+
+go_ids = list()
+
+go_ids[["developmental_processes"]] = c(GOBPOFFSPRING[["GO:0032502"]], "GO:0032502")
+go_ids[["embryo_development_ids"]] = c(GOBPOFFSPRING[["GO:0009790"]], "GO:0009790")
+go_ids[["maintenance_pluripotency"]] = c(GOBPOFFSPRING[["GO:0019827"]], "GO:0019827")
+
+go_ids[["metabolic_processes"]] = c(GOBPOFFSPRING[["GO:0008152"]], "GO:0008152")
+
+go_ids[["immune_system"]] = c(GOBPOFFSPRING[["GO:0002376"]], "GO:0002376")
+
+go_ids[["neuron_differentiation"]] = c(GOBPOFFSPRING[["GO:0030182"]], "GO:0030182")
+
+```
+
+All told, we now have GO term IDs for each of our classes of interest stored in the list go_ids.
