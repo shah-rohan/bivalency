@@ -51,7 +51,24 @@ npc_hmd$cis = npc$cis %>% select(X0:X400) %>% rowMeans
 npc_hmd$trans = npc$trans %>% select(X0:X400) %>% rowMeans
 npc_hmd$Gene = as.character(npc_hmd$Gene)
 
+hmds = list()
+hmds[["naive"]] = naive_hmd
+hmds[["primed"]] = primed_hmd
+hmds[["npc"]] = npc_hmd
+
+rm(naive_hmd, primed_hmd, npc_hmd)
+
 tss_range = seq(-3, 3, by = 0.05)
+
+sleuth_objs = list()
+sleuth_objs[["all"]] = so_all
+sleuth_objs[["naive_npc"]] = so_naive_npc
+sleuth_objs[["naive_primed"]] = so_naive_primed
+sleuth_objs[["primed_npc"]] = so_primed_npc
+
+rm(so_all, so_naive_npc, so_naive_primed, so_primed_npc)
+
+rm(metadata_naive_npc, metadata_naive_primed, metadata_primed_npc)
 
 ```
 
@@ -104,9 +121,9 @@ We observe that there is a significant amount of bivalency (especially trans biv
 
 ```{r all_genes_avgs}
 
-hmd_summary_precursor = naive_hmd %>% mutate(sample = "naive") %>% select(sample, k4:trans)
-hmd_summary_precursor = rbind(hmd_summary_precursor, (primed_hmd %>% mutate(sample = "primed") %>% select(sample, k4:trans)))
-hmd_summary_precursor = rbind(hmd_summary_precursor, (npc_hmd %>% mutate(sample = "npc") %>% select(sample, k4:trans)))
+hmd_summary_precursor = hmds[["naive"]] %>% mutate(sample = "naive") %>% select(sample, k4:trans)
+hmd_summary_precursor = rbind(hmd_summary_precursor, (hmds[["primed"]] %>% mutate(sample = "primed") %>% select(sample, k4:trans)))
+hmd_summary_precursor = rbind(hmd_summary_precursor, (hmds[["npc"]] %>% mutate(sample = "npc") %>% select(sample, k4:trans)))
 
 hmd_summary_all_genes = hmd_summary_precursor %>% group_by(sample) %>% summarize(across(.fns = mean))
 print("HMD Summary Mean")
@@ -127,17 +144,17 @@ bivalent_genes_10 = list()
 bivalent_genes_25 = list()
 bivalent_genes_50 = list()
 
-bivalent_genes_10[["naive"]] = get_biv_genes(naive_hmd, 10)
-bivalent_genes_25[["naive"]] = get_biv_genes(naive_hmd, 25)
-bivalent_genes_50[["naive"]] = get_biv_genes(naive_hmd, 50)
+bivalent_genes_10[["naive"]] = get_biv_genes(hmds[["naive"]], 10)
+bivalent_genes_25[["naive"]] = get_biv_genes(hmds[["naive"]], 25)
+bivalent_genes_50[["naive"]] = get_biv_genes(hmds[["naive"]], 50)
 
-bivalent_genes_10[["primed"]] = get_biv_genes(primed_hmd, 10)
-bivalent_genes_25[["primed"]] = get_biv_genes(primed_hmd, 25)
-bivalent_genes_50[["primed"]] = get_biv_genes(primed_hmd, 50)
+bivalent_genes_10[["primed"]] = get_biv_genes(hmds[["primed"]], 10)
+bivalent_genes_25[["primed"]] = get_biv_genes(hmds[["primed"]], 25)
+bivalent_genes_50[["primed"]] = get_biv_genes(hmds[["primed"]], 50)
 
-bivalent_genes_10[["npc"]] = get_biv_genes(npc_hmd, 10)
-bivalent_genes_25[["npc"]] = get_biv_genes(npc_hmd, 25)
-bivalent_genes_50[["npc"]] = get_biv_genes(npc_hmd, 50)
+bivalent_genes_10[["npc"]] = get_biv_genes(hmds[["npc"]], 10)
+bivalent_genes_25[["npc"]] = get_biv_genes(hmds[["npc"]], 25)
+bivalent_genes_50[["npc"]] = get_biv_genes(hmds[["npc"]], 50)
 
 ```
 
@@ -164,10 +181,10 @@ Basically, no matter how we call it, bivalent genes seem to broadly stay bivalen
 ```{r naive_dominance_sectioning}
 
 naive_dominance = list()
-naive_hmd = naive_hmd %>% mutate(logratio = log(k27+1) - log(k4+1))
-naive_dominance[["k27"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
-naive_dominance[["k4"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
-naive_dominance[["mid"]] = (naive_hmd %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
+hmds[["naive"]] = hmds[["naive"]] %>% mutate(logratio = log(k27+1) - log(k4+1))
+naive_dominance[["k27"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
+naive_dominance[["k4"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
+naive_dominance[["mid"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
 
 ```
 
