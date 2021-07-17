@@ -86,7 +86,7 @@ metagene = function(dataset, range, genes){
   summ_df = data.frame(dist = range)
   
   for (i in dataset_names){
-    summ_df[,i] = as.numeric(dataset[[i]] %>% filter(Gene %in% genes) %>% select(-1) %>% summarize(across(.fns = mean)))
+    summ_df[,i] = as.numeric(dataset[[i]] %>% filter(Gene %in% genes) %>% dplyr::select(-1) %>% summarize(across(.fns = mean)))
   }
   
   return(summ_df)
@@ -261,3 +261,23 @@ go_ids[["neuron_differentiation"]] = c(GOBPOFFSPRING[["GO:0030182"]], "GO:003018
 ```
 
 All told, we now have GO term IDs for each of our classes of interest stored in the list go_ids.
+## Sectioning Metagenes with Gene Ontology
+
+We will now use the different gene ontology terms we have just identified to create metagene plots across different GO term classes.
+
+```{r go_metagenes}
+
+for (go_term in names(go_ids))
+{
+  overlapgenes = (refseq_ensembl_external_go %>% filter(go_id %in% go_ids[[go_term]] & refseq_id %in% bivalent_genes_25[["naive"]]))$refseq_id
+  
+  count_genes = length(overlapgenes)
+  
+  metagene_plot(metagene(naive, tss_range, overlapgenes), title = paste0("Naive cells at naive 25% bivalent genes HMD in GO term ", go_term, " (", count_genes, " genes)"))
+  metagene_plot(metagene(primed, tss_range, overlapgenes), title = paste0("Primed cells at naive 25% bivalent genes HMD in GO term ", go_term, " (", count_genes, " genes)"))
+  metagene_plot(metagene(npc, tss_range, overlapgenes), title = paste0("NPC cells at naive 25% bivalent genes HMD in GO term ", go_term, " (", count_genes, " genes)"))
+}
+
+```
+
+Across the different GO term classes, bivalent genes remain bivalent. 
