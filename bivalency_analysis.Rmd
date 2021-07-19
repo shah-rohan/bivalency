@@ -345,9 +345,9 @@ Having the above gene expression matrix, I want to examine the way in which gene
 violin_df = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
 violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
 
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "Arial"))
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at genes with >25% bivalency in naive mESCs")
 print(violin_plt)
 
-rm(violin_df)
+rm(violin_df, violin_plt)
 
 ```
