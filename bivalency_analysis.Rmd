@@ -2,7 +2,9 @@
 title: "bivalency_analysis"
 author: "Rohan Shah"
 date: "7/15/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -215,16 +217,13 @@ My next goal will be to conduct metagene analysis on differnet gene ontologies. 
 
 ```{r gene_ontology_setup}
 
-library(biomaRt)
-library(tidyverse)
+ensembl = biomaRt::useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
+attributes = biomaRt::listAttributes(ensembl)
+filters = biomaRt::listFilters(ensembl)
 
-ensembl = useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
-attributes = listAttributes(ensembl)
-filters = listFilters(ensembl)
+go_refseq_mrna = biomaRt::getBM(attributes = c('refseq_mrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = 'with_refseq_mrna', values = TRUE, mart = ensembl)
 
-go_refseq_mrna = getBM(attributes = c('refseq_mrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = 'with_refseq_mrna', values = TRUE, mart = ensembl)
-
-go_refseq_ncrna = getBM(attributes = c('refseq_ncrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = c('with_refseq_mrna', 'with_refseq_ncrna'), values = list(FALSE, TRUE), mart = ensembl)
+go_refseq_ncrna = biomaRt::getBM(attributes = c('refseq_ncrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = c('with_refseq_mrna', 'with_refseq_ncrna'), values = list(FALSE, TRUE), mart = ensembl)
 
 colnames(go_refseq_mrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
 colnames(go_refseq_ncrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
@@ -244,19 +243,17 @@ First, we will want to get GO terms and their offspring for developmental proces
 
 ```{r go_offspring}
 
-library(GO.db)
-
 go_ids = list()
 
-go_ids[["developmental_processes"]] = c(GOBPOFFSPRING[["GO:0032502"]], "GO:0032502")
-go_ids[["embryo_development_ids"]] = c(GOBPOFFSPRING[["GO:0009790"]], "GO:0009790")
-go_ids[["maintenance_pluripotency"]] = c(GOBPOFFSPRING[["GO:0019827"]], "GO:0019827")
+go_ids[["developmental_processes"]] = c(GO.db::GOBPOFFSPRING[["GO:0032502"]], "GO:0032502")
+go_ids[["embryo_development_ids"]] = c(GO.db::GOBPOFFSPRING[["GO:0009790"]], "GO:0009790")
+go_ids[["maintenance_pluripotency"]] = c(GO.db::GOBPOFFSPRING[["GO:0019827"]], "GO:0019827")
 
-go_ids[["metabolic_processes"]] = c(GOBPOFFSPRING[["GO:0008152"]], "GO:0008152")
+go_ids[["metabolic_processes"]] = c(GO.db::GOBPOFFSPRING[["GO:0008152"]], "GO:0008152")
 
-go_ids[["immune_system"]] = c(GOBPOFFSPRING[["GO:0002376"]], "GO:0002376")
+go_ids[["immune_system"]] = c(GO.db::GOBPOFFSPRING[["GO:0002376"]], "GO:0002376")
 
-go_ids[["neuron_differentiation"]] = c(GOBPOFFSPRING[["GO:0030182"]], "GO:0030182")
+go_ids[["neuron_differentiation"]] = c(GO.db::GOBPOFFSPRING[["GO:0030182"]], "GO:0030182")
 
 ```
 
@@ -281,3 +278,60 @@ for (go_term in names(go_ids))
 ```
 
 Across the different GO term classes, bivalent genes remain bivalent. 
+## RNA-seq First-Pass Analysis
+
+We have three RNA-seq datasets, which we have already aligned against the Refseq cDNA for mm10 using Kallisto and loaded into Sleuth. These are contained in sleuth_objs.
+
+First, we will look at the data by PCA.
+
+```{r pca_bulk_rna}
+
+plot_pca(sleuth_objs$all, color_by = "cell_type")
+plot_pca(sleuth_objs$naive_npc, color_by = "rep")
+plot_pca(sleuth_objs$naive_primed, color_by = "rep")
+plot_pca(sleuth_objs$primed_npc, color_by = "rep")
+
+```
+
+PCA looks fine, samples separate as expected without huge batch effects except with primed to NPC. We'll correct for replicate there but will otherwise just use a naive comparison.
+
+First, we will compare naive to NPC, then naive to primed, then finally primed to NPC.
+
+```{r diff_exp}
+
+sleuth_table_gene = list()
+
+sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~1, 'naive')
+sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~cell_type, 'cell_type')
+sleuth_objs$naive_npc = sleuth_lrt(sleuth_objs$naive_npc, 'naive', 'cell_type')
+
+sleuth_table_gene[["naive_npc"]] = sleuth_results(sleuth_objs$naive_npc, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+
+sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~1, 'naive')
+sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~cell_type, 'cell_type')
+sleuth_objs$naive_primed = sleuth_lrt(sleuth_objs$naive_primed, 'naive', 'cell_type')
+
+sleuth_table_gene[["naive_primed"]] = sleuth_results(sleuth_objs$naive_primed, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+
+sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~1, 'naive')
+sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep, 'rep')
+sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~cell_type, 'cell_type')
+sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep+cell_type, 'full')
+sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'naive', 'cell_type')
+sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'rep', 'full')
+
+sleuth_table_gene[["primed_npc"]] = sleuth_results(sleuth_objs$primed_npc, 'rep:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+
+```
+
+We see that there are several thousand genes that are differentially expressed in all these conditions: 19450/51998 from naive to NPC, 17835/50800 from naive to primed, and 9908/50126 from primed to NPC.
+
+We also want to be able to get our average gene expression for each gene.
+
+```{r average_gene_expression}
+
+gene_expression = sleuth_objs$all$obs_norm %>% separate(sample, c("cell_type", "rep"), sep = "_RNA_rep") %>% group_by(target_id, cell_type) %>% select(target_id, cell_type, tpm) %>% summarize(across(.fns = mean)) %>% spread(key = cell_type, value = tpm)
+
+gene_expression = gene_expression %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) %>% select(target_id, refseq_id, naive = mESC_with2i, primed = mESC_no2i, npc = NPC)
+
+```
