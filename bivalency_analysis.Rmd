@@ -330,8 +330,24 @@ We also want to be able to get our average gene expression for each gene.
 
 ```{r average_gene_expression}
 
-gene_expression = sleuth_objs$all$obs_norm %>% separate(sample, c("cell_type", "rep"), sep = "_RNA_rep") %>% group_by(target_id, cell_type) %>% select(target_id, cell_type, tpm) %>% summarize(across(.fns = mean)) %>% spread(key = cell_type, value = tpm)
+gene_expression = sleuth_objs$all$obs_norm %>% separate(sample, c("cell_type", "rep"), sep = "_RNA_rep") %>% group_by(target_id, cell_type) %>% select(target_id, cell_type, tpm) %>% summarize(across(.fns = mean)) %>% ungroup %>% spread(key = cell_type, value = tpm)
 
-gene_expression = gene_expression %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) %>% select(target_id, refseq_id, naive = mESC_with2i, primed = mESC_no2i, npc = NPC)
+gene_expression = gene_expression %>% data.frame %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) %>% select(target_id, refseq_id, naive = mESC_with2i, primed = mESC_no2i, npc = NPC)
+
+```
+
+## Integrating RNA-seq and HMD Metagene Analysis
+
+Having the above gene expression matrix, I want to examine the way in which gene expression changes across these different datasets from naive to NPC at naive bivalent genes.
+
+```{r gene_expression_naive_bivalent}
+
+violin_df = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "Arial"))
+print(violin_plt)
+
+rm(violin_df)
 
 ```
