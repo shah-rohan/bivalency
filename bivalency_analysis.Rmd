@@ -476,3 +476,34 @@ metagene_plot(metagene(npc, tss_range, nonregulated_genes$naive_npc), title = pa
 ```
 
 Minor differences in magnitude aside, there is basically no difference between the bivalency profiles of upregulated and downregulated genes.
+
+## Gene ontology and bivalency classes
+
+We can now move on to running gene ontology on our different bivalency classes. We will run these by Ensembl gene IDs. First order of business is to set up our analysis by preparing the data.
+
+```{r gene_ontology_prep, message = FALSE, warning = FALSE}
+
+library(topGO)
+library(GO.db)
+
+ensembl_dominance = list()
+ensembl_dominance$k27 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k27) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+ensembl_dominance$k4 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k4) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+ensembl_dominance$mid = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$mid) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+
+gene_2_go = unstack((refseq_ensembl_external_go %>% filter(ensembl_gene_id %in% ensembl_with_go))[,c(4,2)])
+
+genelists_ontology = list()
+genelists_ontology$k27 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k27))
+names(genelists_ontology$k27) = ensembl_with_go
+genelists_ontology$k4 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k4))
+names(genelists_ontology$k4) = ensembl_with_go
+genelists_ontology$mid = factor(as.integer(ensembl_with_go %in% ensembl_dominance$mid))
+names(genelists_ontology$mid) = ensembl_with_go
+
+godata = list()
+godata$k27 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k27, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+godata$k4 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k4, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+godata$mid = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$mid, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+
+```
