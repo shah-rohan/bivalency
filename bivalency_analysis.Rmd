@@ -507,3 +507,30 @@ godata$k4 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k4, 
 godata$mid = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$mid, annot = annFUN.gene2GO, gene2GO = gene_2_go)
 
 ```
+
+Having set that up, we will now define a function so that we can run gene ontology analyses and test for significance more efficiently.
+
+```{r gene_ontology_functions}
+
+testGO = function(GOdata){
+  classic_fisher_result = runTest(GOdata, algorithm = "classic", statistic = "fisher")
+  allGO = usedGO(GOdata)
+  all_res = GenTable(GOdata, classicFisher = classic_fisher_result, orderBy = 'classicFisher', topNodes = length(allGO))
+  p.adj=round(p.adjust(all_res$classicFisher,method="BH"),digits = 4)
+  all_res_final=cbind(all_res,p.adj)
+  all_res_final=all_res_final[order(all_res_final$p.adj),]
+  return(all_res_final)
+}
+
+```
+
+We will now conduct GO analysis on the datasets described above.
+
+```{r gene_ontology_dominance_runner}
+
+go_tables = list()
+go_tables$k27 = testGO(godata$k27)
+go_tables$k4 = testGO(godata$k4)
+go_tables$mid = testGO(godata$mid)
+
+```
