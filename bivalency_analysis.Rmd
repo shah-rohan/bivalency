@@ -19,13 +19,13 @@ This R Markdown file is meant to streamline the analysis of the bivalency data a
 
 This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries.
 
-```{r data_loader}
+```{r data_loader, message = FALSE, warning = FALSE}
 
 library(tidyverse)
 library(sleuth)
 
-load("data_loaded.RData")
-load("sleuth_loaded_bivalency_bulk-rna-seq.RData")
+load("rdata/data_loaded.RData")
+load("rdata/sleuth_loaded_bivalency_bulk-rna-seq.RData")
 
 #Redo the HMDs for 0-400bp about the TSS
 
@@ -76,7 +76,7 @@ rm(metadata_naive_npc, metadata_naive_primed, metadata_primed_npc)
 
 The next chunk loads in functions to make metagenes.
 
-```{r metagene_functions}
+```{r metagene_functions, message = FALSE, warning = FALSE}
 
 get_biv_genes = function(dataset, threshold){
   genes = (dataset %>% filter(trans > threshold))$Gene
@@ -111,7 +111,7 @@ metagene_plot = function(summ_df, ylims = NA, title = NA){
 
 First, we have to have a sense of how bivalency exists at all genes. To do this, we will plot metagenes of all genes for all samples.
 
-```{r all_genes_meta, warning = FALSE}
+```{r all_genes_meta}
 
 metagene_plot(metagene(naive, tss_range, consensusGenes), ylims = c(0,80), title = "Naive mESCs")
 metagene_plot(metagene(primed, tss_range, consensusGenes), ylims = c(0,80), title = "Primed mESCs")
@@ -121,7 +121,7 @@ metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title =
 
 We observe that there is a significant amount of bivalency (especially trans bivalency) at all genes from naive, primed, and NPC samples. Importantly, it seems that bivalency actually *increases* over time rather than decreasing. This is interesting. My next step is to identify the average amount of bivalency in each of these samples -- and that of all other modifications, while I'm at it.
 
-```{r all_genes_avgs}
+```{r all_genes_avgs, message = FALSE, warning = FALSE}
 
 hmd_summary_precursor = hmds[["naive"]] %>% mutate(sample = "naive") %>% select(sample, k4:trans)
 hmd_summary_precursor = rbind(hmd_summary_precursor, (hmds[["primed"]] %>% mutate(sample = "primed") %>% select(sample, k4:trans)))
@@ -140,7 +140,7 @@ rm(hmd_summary_precursor, hmd_summary_all_genes)
 
 Both by mean and median, we see that bivalency again increases from naive to primed to npc, with median trans HMDs of approximately 20%, 40%, and 30%, respectively. This means it will be somewhat difficult to identify genes that are truly "bivalent," so we're goign to go with initial thresholds of 10%, 25%, and 50%. We will load these all into lists for the sake of ease just to make it easier to handle them in the future.
 
-```{r bivalent_thresholding}
+```{r bivalent_thresholding, message = FALSE, warning = FALSE}
 
 bivalent_genes_10 = list()
 bivalent_genes_25 = list()
@@ -178,7 +178,11 @@ metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "N
 
 ```
 
-Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent. Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
+Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent.
+
+### Dominance sectioning
+
+Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
 
 ```{r naive_dominance_sectioning}
 
@@ -210,14 +214,13 @@ metagene_plot(metagene(npc, tss_range, naive_dominance[["mid"]]), title = "NPC c
 
 Overwhelmingly, it again seems that across these bivalency dominance classes, bivalent genes remain bivalent.
 
-
 ## Gene Ontology Setup
 
 My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
 
 ```{r gene_ontology_setup}
 
-if (!file.exists("go_terms.RData")){
+if (!file.exists("rdata/go_terms.RData")){
   ensembl = biomaRt::useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
   attributes = biomaRt::listAttributes(ensembl)
   filters = biomaRt::listFilters(ensembl)
@@ -235,9 +238,9 @@ if (!file.exists("go_terms.RData")){
   genename_with_go = (refseq_ensembl_external_go %>% filter(external_gene_name != ""))$external_gene_name %>% unique
   
   rm(ensembl, attributes, filters, go_refseq_mrna, go_refseq_ncrna)
-  save.image("go_terms.RData")
+  save.image("rdata/go_terms.RData")
 } else {
-  load("go_terms.RData")
+  load("rdata/go_terms.RData")
 }
 
 ```
@@ -263,6 +266,7 @@ go_ids[["neuron_differentiation"]] = c(GO.db::GOBPOFFSPRING[["GO:0030182"]], "GO
 ```
 
 All told, we now have GO term IDs for each of our classes of interest stored in the list go_ids.
+
 ## Sectioning Metagenes with Gene Ontology
 
 We will now use the different gene ontology terms we have just identified to create metagene plots across different GO term classes.
@@ -303,9 +307,9 @@ PCA looks fine, samples separate as expected without huge batch effects except w
 
 First, we will compare naive to NPC, then naive to primed, then finally primed to NPC.
 
-```{r diff_exp}
+```{r diff_exp, message = FALSE, warning = FALSE}
 
-if (!file.exists("sleuth_analysis.RData")){
+if (!file.exists("rdata/sleuth_analysis.RData")){
   sleuth_table_gene = list()
 
   sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~1, 'naive')
@@ -329,9 +333,9 @@ if (!file.exists("sleuth_analysis.RData")){
   
   sleuth_table_gene[["primed_npc"]] = sleuth_results(sleuth_objs$primed_npc, 'rep:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1"))
   
-  save.image("sleuth_analysis.RData")
+  save.image("rdata/sleuth_analysis.RData")
 } else{
-  load("sleuth_analysis.RData")
+  load("rdata/sleuth_analysis.RData")
 }
 
 ```
@@ -340,10 +344,10 @@ We see that there are several thousand genes that are differentially expressed i
 
 We also want to be able to get our average gene expression for each gene.
 
-```{r average_gene_expression}
+```{r average_gene_expression, message = FALSE, warning = FALSE}
 
 gene_expression = sleuth_objs$all$obs_norm %>% separate(sample, c("cell_type", "rep"), sep = "_RNA_rep") %>% group_by(target_id, cell_type) %>% select(target_id, cell_type, tpm) %>% summarize(across(.fns = mean)) %>% ungroup %>% spread(key = cell_type, value = tpm)
-
+  
 gene_expression = gene_expression %>% data.frame %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) %>% select(target_id, refseq_id, naive = mESC_with2i, primed = mESC_no2i, npc = NPC)
 
 ```
@@ -374,7 +378,9 @@ nonregulated_genes$primed_npc = (sleuth_table_gene$primed_npc %>% filter(qval > 
 
 Having the above gene expression matrix, I want to examine the way in which gene expression changes across these different datasets from naive to NPC.
 
-First thing to do is to get the gene expression of the genes overall
+### Violin plots of gene expression
+
+First thing to do is to get the gene expression of the genes overall.
 
 ```{r gene_expression_violin}
 
@@ -402,7 +408,56 @@ rm(violin_df, violin_plt)
 
 ```
 
-We see only subtle changes at best. The other obvious thing is to look at upregulated genes, downregulated genes, and insignificantly changed genes to look at bivalency metaprofiles there.
+We see only subtle changes at best. Let us now section by K27 or K4 dominance.
+
+```{r dominance_bivalent_gene_expression}
+
+violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$k27) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at K27 dominant genes in naive mESCs")
+print(violin_plt)
+
+rm(violin_df, violin_plt)
+
+violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$k4) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at K4 dominant genes in naive mESCs")
+print(violin_plt)
+
+rm(violin_df, violin_plt)
+
+violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$mid) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at mid dominant genes in naive mESCs")
+print(violin_plt)
+
+rm(violin_df, violin_plt)
+
+```
+
+The other thing that we can do here is to bin the naive mESC bivalent genes by gene expression, then track those subsets of genes across the differentiation pathway.
+
+```{r section_by_gene_expression}
+
+for (i in 1:5)
+{
+  gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
+  countup = floor(length(gene_expression_bivalent$naive)/5)
+  violin_df = gene_expression_bivalent %>% arrange(desc(naive)) %>%  slice((countup*(i-1)):(countup*i - 1)) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+  violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+  
+  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
+  print(violin_plt)
+}
+
+```
+
+### Metaprofiles by gene expression
+
+The other obvious thing is to look at upregulated genes, downregulated genes, and insignificantly changed genes to look at bivalency metaprofiles there.
 
 ```{r metaprofiles_upreg_downreg}
 
