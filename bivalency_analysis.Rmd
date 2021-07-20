@@ -215,25 +215,30 @@ Overwhelmingly, it again seems that across these bivalency dominance classes, bi
 
 My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
 
-```{r gene_ontology_setup, cache = TRUE}
+```{r gene_ontology_setup}
 
-ensembl = biomaRt::useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
-attributes = biomaRt::listAttributes(ensembl)
-filters = biomaRt::listFilters(ensembl)
-
-go_refseq_mrna = biomaRt::getBM(attributes = c('refseq_mrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = 'with_refseq_mrna', values = TRUE, mart = ensembl)
-
-go_refseq_ncrna = biomaRt::getBM(attributes = c('refseq_ncrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = c('with_refseq_mrna', 'with_refseq_ncrna'), values = list(FALSE, TRUE), mart = ensembl)
-
-colnames(go_refseq_mrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
-colnames(go_refseq_ncrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
-refseq_ensembl_external_go = rbind(go_refseq_mrna, go_refseq_ncrna) %>% filter(refseq_id != "") %>% filter(go_id != "")
-
-refseq_with_go = refseq_ensembl_external_go$refseq_id %>% unique
-ensembl_with_go = refseq_ensembl_external_go$ensembl_gene_id %>% unique
-genename_with_go = (refseq_ensembl_external_go %>% filter(external_gene_name != ""))$external_gene_name %>% unique
-
-rm(ensembl, attributes, filters, go_refseq_mrna, go_refseq_ncrna)
+if (!file.exists("go_terms.RData")){
+  ensembl = biomaRt::useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
+  attributes = biomaRt::listAttributes(ensembl)
+  filters = biomaRt::listFilters(ensembl)
+  
+  go_refseq_mrna = biomaRt::getBM(attributes = c('refseq_mrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = 'with_refseq_mrna', values = TRUE, mart = ensembl)
+  
+  go_refseq_ncrna = biomaRt::getBM(attributes = c('refseq_ncrna', 'ensembl_gene_id', 'external_gene_name', 'go_id'), filters = c('with_refseq_mrna', 'with_refseq_ncrna'), values = list(FALSE, TRUE), mart = ensembl)
+  
+  colnames(go_refseq_mrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
+  colnames(go_refseq_ncrna) = c('refseq_id', 'ensembl_gene_id', 'external_gene_name', 'go_id')
+  refseq_ensembl_external_go = rbind(go_refseq_mrna, go_refseq_ncrna) %>% filter(refseq_id != "") %>% filter(go_id != "")
+  
+  refseq_with_go = refseq_ensembl_external_go$refseq_id %>% unique
+  ensembl_with_go = refseq_ensembl_external_go$ensembl_gene_id %>% unique
+  genename_with_go = (refseq_ensembl_external_go %>% filter(external_gene_name != ""))$external_gene_name %>% unique
+  
+  rm(ensembl, attributes, filters, go_refseq_mrna, go_refseq_ncrna)
+  save.image("go_terms.RData")
+} else {
+  load("go_terms.RData")
+}
 
 ```
 
@@ -278,6 +283,7 @@ for (go_term in names(go_ids))
 ```
 
 Across the different GO term classes, bivalent genes remain bivalent. 
+
 ## RNA-seq First-Pass Analysis
 
 We have three RNA-seq datasets, which we have already aligned against the Refseq cDNA for mm10 using Kallisto and loaded into Sleuth. These are contained in sleuth_objs.
@@ -297,30 +303,36 @@ PCA looks fine, samples separate as expected without huge batch effects except w
 
 First, we will compare naive to NPC, then naive to primed, then finally primed to NPC.
 
-```{r diff_exp, cache = TRUE}
+```{r diff_exp}
 
-sleuth_table_gene = list()
+if (!file.exists("sleuth_analysis.RData")){
+  sleuth_table_gene = list()
 
-sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~1, 'naive')
-sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~cell_type, 'cell_type')
-sleuth_objs$naive_npc = sleuth_lrt(sleuth_objs$naive_npc, 'naive', 'cell_type')
-
-sleuth_table_gene[["naive_npc"]] = sleuth_results(sleuth_objs$naive_npc, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
-
-sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~1, 'naive')
-sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~cell_type, 'cell_type')
-sleuth_objs$naive_primed = sleuth_lrt(sleuth_objs$naive_primed, 'naive', 'cell_type')
-
-sleuth_table_gene[["naive_primed"]] = sleuth_results(sleuth_objs$naive_primed, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
-
-sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~1, 'naive')
-sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep, 'rep')
-sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~cell_type, 'cell_type')
-sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep+cell_type, 'full')
-sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'naive', 'cell_type')
-sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'rep', 'full')
-
-sleuth_table_gene[["primed_npc"]] = sleuth_results(sleuth_objs$primed_npc, 'rep:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+  sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~1, 'naive')
+  sleuth_objs$naive_npc = sleuth_fit(sleuth_objs$naive_npc, ~cell_type, 'cell_type')
+  sleuth_objs$naive_npc = sleuth_lrt(sleuth_objs$naive_npc, 'naive', 'cell_type')
+  
+  sleuth_table_gene[["naive_npc"]] = sleuth_results(sleuth_objs$naive_npc, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+  
+  sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~1, 'naive')
+  sleuth_objs$naive_primed = sleuth_fit(sleuth_objs$naive_primed, ~cell_type, 'cell_type')
+  sleuth_objs$naive_primed = sleuth_lrt(sleuth_objs$naive_primed, 'naive', 'cell_type')
+  
+  sleuth_table_gene[["naive_primed"]] = sleuth_results(sleuth_objs$naive_primed, 'naive:cell_type', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1")) 
+  
+  sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~1, 'naive')
+  sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep, 'rep')
+  sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~cell_type, 'cell_type')
+  sleuth_objs$primed_npc = sleuth_fit(sleuth_objs$primed_npc, ~rep+cell_type, 'full')
+  sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'naive', 'cell_type')
+  sleuth_objs$primed_npc = sleuth_lrt(sleuth_objs$primed_npc, 'rep', 'full')
+  
+  sleuth_table_gene[["primed_npc"]] = sleuth_results(sleuth_objs$primed_npc, 'rep:full', 'lrt', show_all = FALSE, pval_aggregate = FALSE) %>% mutate(refseq_id = str_replace(target_id, "([A-Za-z0-9_]*)\\.[0-9]*", "\\1"))
+  
+  save.image("sleuth_analysis.RData")
+} else{
+  load("sleuth_analysis.RData")
+}
 
 ```
 
@@ -336,9 +348,47 @@ gene_expression = gene_expression %>% data.frame %>% mutate(refseq_id = str_repl
 
 ```
 
+We must also identify upregulated and downregulated genes
+
+```{r upregulated_downregulated}
+
+upregulated_genes = list()
+downregulated_genes = list()
+nonregulated_genes = list()
+
+upregulated_genes$naive_npc = (sleuth_table_gene$naive_npc %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(npc > naive))$refseq_id
+downregulated_genes$naive_npc = (sleuth_table_gene$naive_npc %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(npc < naive))$refseq_id
+nonregulated_genes$naive_npc = (sleuth_table_gene$naive_npc %>% filter(qval > 0.05))$refseq_id
+
+upregulated_genes$naive_primed = (sleuth_table_gene$naive_primed %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(primed > naive))$refseq_id
+downregulated_genes$naive_primed = (sleuth_table_gene$naive_primed %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(primed < naive))$refseq_id
+nonregulated_genes$naive_primed = (sleuth_table_gene$naive_primed %>% filter(qval > 0.05))$refseq_id
+
+upregulated_genes$primed_npc = (sleuth_table_gene$primed_npc %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(npc > primed))$refseq_id
+downregulated_genes$primed_npc = (sleuth_table_gene$primed_npc %>% filter(qval <= 0.05) %>% inner_join(gene_expression, by = "refseq_id") %>% filter(npc < primed))$refseq_id
+nonregulated_genes$primed_npc = (sleuth_table_gene$primed_npc %>% filter(qval > 0.05))$refseq_id
+
+```
+
 ## Integrating RNA-seq and HMD Metagene Analysis
 
-Having the above gene expression matrix, I want to examine the way in which gene expression changes across these different datasets from naive to NPC at naive bivalent genes.
+Having the above gene expression matrix, I want to examine the way in which gene expression changes across these different datasets from naive to NPC.
+
+First thing to do is to get the gene expression of the genes overall
+
+```{r gene_expression_violin}
+
+violin_df = gene_expression %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at all genes in naive mESCs")
+print(violin_plt)
+
+rm(violin_df, violin_plt)
+
+```
+
+Next, we plot gene expression of bivalent genes in naive cells.
 
 ```{r gene_expression_naive_bivalent}
 
@@ -351,3 +401,23 @@ print(violin_plt)
 rm(violin_df, violin_plt)
 
 ```
+
+We see only subtle changes at best. The other obvious thing is to look at upregulated genes, downregulated genes, and insignificantly changed genes to look at bivalency metaprofiles there.
+
+```{r metaprofiles_upreg_downreg}
+
+metagene_plot(metagene(naive, tss_range, upregulated_genes$naive_npc), title = paste0("Naive cells at genes upregulated from naive to NPC (", length(upregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(primed, tss_range, upregulated_genes$naive_npc), title = paste0("Primed cells at genes upregulated from naive to NPC (", length(upregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(npc, tss_range, upregulated_genes$naive_npc), title = paste0("NPC cells at genes upregulated from naive to NPC (", length(upregulated_genes$naive_npc), " genes)"))
+
+metagene_plot(metagene(naive, tss_range, downregulated_genes$naive_npc), title = paste0("Naive cells at genes downregulated from naive to NPC (", length(downregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(primed, tss_range, downregulated_genes$naive_npc), title = paste0("Primed cells at genes downregulated from naive to NPC (", length(downregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(npc, tss_range, downregulated_genes$naive_npc), title = paste0("NPC cells at genes downregulated from naive to NPC (", length(downregulated_genes$naive_npc), " genes)"))
+
+metagene_plot(metagene(naive, tss_range, nonregulated_genes$naive_npc), title = paste0("Naive cells at genes nonregulated from naive to NPC (", length(nonregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(primed, tss_range, nonregulated_genes$naive_npc), title = paste0("Primed cells at genes nonregulated from naive to NPC (", length(nonregulated_genes$naive_npc), " genes)"))
+metagene_plot(metagene(npc, tss_range, nonregulated_genes$naive_npc), title = paste0("NPC cells at genes nonregulated from naive to NPC (", length(nonregulated_genes$naive_npc), " genes)"))
+
+```
+
+Minor differences in magnitude aside, there is basically no difference between the bivalency profiles of upregulated and downregulated genes.
