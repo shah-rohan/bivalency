@@ -11,11 +11,11 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Introduction
+# Introduction
 
 This R Markdown file is meant to streamline the analysis of the bivalency data and keep it organized in one place. Different types of analyses will be in different sections with explanations as to why those are important. This section will contain only data loading and functions that are necessary for downstream analyses.
 
-### Data loading
+## Data loading
 
 This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries.
 
@@ -107,7 +107,7 @@ metagene_plot = function(summ_df, ylims = NA, title = NA){
 
 ```
 
-## First-Pass HMD Metagene Analysis
+# First-Pass HMD Metagene Analysis
 
 First, we have to have a sense of how bivalency exists at all genes. To do this, we will plot metagenes of all genes for all samples.
 
@@ -180,7 +180,7 @@ metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "N
 
 Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent.
 
-### Dominance sectioning
+## Dominance sectioning
 
 Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
 
@@ -214,7 +214,7 @@ metagene_plot(metagene(npc, tss_range, naive_dominance[["mid"]]), title = "NPC c
 
 Overwhelmingly, it again seems that across these bivalency dominance classes, bivalent genes remain bivalent.
 
-## Gene Ontology Setup
+# Gene Ontology Setup
 
 My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
 
@@ -267,7 +267,7 @@ go_ids[["neuron_differentiation"]] = c(GO.db::GOBPOFFSPRING[["GO:0030182"]], "GO
 
 All told, we now have GO term IDs for each of our classes of interest stored in the list go_ids.
 
-## Sectioning Metagenes with Gene Ontology
+# Sectioning Metagenes with Gene Ontology
 
 We will now use the different gene ontology terms we have just identified to create metagene plots across different GO term classes.
 
@@ -288,7 +288,7 @@ for (go_term in names(go_ids))
 
 Across the different GO term classes, bivalent genes remain bivalent. 
 
-## RNA-seq First-Pass Analysis
+# RNA-seq First-Pass Analysis
 
 We have three RNA-seq datasets, which we have already aligned against the Refseq cDNA for mm10 using Kallisto and loaded into Sleuth. These are contained in sleuth_objs.
 
@@ -374,11 +374,11 @@ nonregulated_genes$primed_npc = (sleuth_table_gene$primed_npc %>% filter(qval > 
 
 ```
 
-## Integrating RNA-seq and HMD Metagene Analysis
+# Integrating RNA-seq and HMD Metagene Analysis
 
 Having the above gene expression matrix, I want to examine the way in which gene expression changes across these different datasets from naive to NPC.
 
-### Violin plots of gene expression
+## Violin plots of gene expression
 
 First thing to do is to get the gene expression of the genes overall.
 
@@ -453,9 +453,11 @@ for (i in 1:5)
   print(violin_plt)
 }
 
+rm(gene_expression_bivalent, countup, violin_df, violin_plt)
+
 ```
 
-### Metaprofiles by gene expression
+## Metaprofiles by gene expression
 
 The other obvious thing is to look at upregulated genes, downregulated genes, and insignificantly changed genes to look at bivalency metaprofiles there.
 
@@ -477,7 +479,7 @@ metagene_plot(metagene(npc, tss_range, nonregulated_genes$naive_npc), title = pa
 
 Minor differences in magnitude aside, there is basically no difference between the bivalency profiles of upregulated and downregulated genes.
 
-## Gene ontology and bivalency classes
+# Gene ontology and bivalency classes
 
 We can now move on to running gene ontology on our different bivalency classes. We will run these by Ensembl gene IDs. First order of business is to set up our analysis by preparing the data.
 
@@ -510,13 +512,14 @@ godata$mid = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$mid
 
 Having set that up, we will now define a function so that we can run gene ontology analyses and test for significance more efficiently.
 
-```{r gene_ontology_functions}
+```{r gene_ontology_functions, message = FALSE, warning = FALSE}
 
-testGO = function(GOdata){
-  classic_fisher_result = runTest(GOdata, algorithm = "classic", statistic = "fisher")
+testGO = function(GOdata, algo = "classic"){
+  fisher_result = runTest(GOdata, algorithm = algo, statistic = "fisher")
   allGO = usedGO(GOdata)
-  all_res = GenTable(GOdata, classicFisher = classic_fisher_result, orderBy = 'classicFisher', topNodes = length(allGO))
-  p.adj=round(p.adjust(all_res$classicFisher,method="BH"),digits = 4)
+  all_res = GenTable(GOdata, Fisher = fisher_result, orderBy = 'Fisher', topNodes = length(allGO))
+  p.adj=round(p.adjust(all_res$Fisher,method="BH"),digits = 4)
+  p.adj[is.na(p.adj)] = 0
   all_res_final=cbind(all_res,p.adj)
   all_res_final=all_res_final[order(all_res_final$p.adj),]
   return(all_res_final)
@@ -524,13 +527,29 @@ testGO = function(GOdata){
 
 ```
 
-We will now conduct GO analysis on the datasets described above.
+We valswill now conduct GO analysis on the datasets described above.
 
 ```{r gene_ontology_dominance_runner}
 
-go_tables = list()
-go_tables$k27 = testGO(godata$k27)
-go_tables$k4 = testGO(godata$k4)
-go_tables$mid = testGO(godata$mid)
+go_classic_tables = list()
+go_classic_tables$k27 = testGO(godata$k27)
+go_classic_tables$k4 = testGO(godata$k4)
+go_classic_tables$mid = testGO(godata$mid)
+
+```
+
+I don't know what to do here -- I guess pull out some of the terms that we looked at before?
+
+```{r gene_ontology_terms_pvals, message = FALSE, warning = FALSE}
+
+library(biomaRt)
+detach(package:biomaRt, unload = TRUE)
+
+go_term_pvals = data.frame(GO.ID = c("GO:0032502", "GO:0009790", "GO:0019827", "GO:0030182", "GO:0008152", "GO:0002376"))
+go_term_pvals = go_term_pvals %>% inner_join(go_classic_tables$k27, by = "GO.ID") %>% select(GO.ID, Term, k27 = p.adj)
+go_term_pvals = go_term_pvals %>% inner_join(go_classic_tables$k4, by = "GO.ID") %>% select(GO.ID, Term = Term.x, k27, k4 = p.adj)
+go_term_pvals = go_term_pvals %>% inner_join(go_classic_tables$mid, by = "GO.ID") %>% select(GO.ID, Term = Term.x, k27, k4, mid = p.adj)
+
+print(go_term_pvals)
 
 ```
