@@ -215,7 +215,7 @@ Overwhelmingly, it again seems that across these bivalency dominance classes, bi
 
 My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
 
-```{r gene_ontology_setup}
+```{r gene_ontology_setup, cache = TRUE}
 
 ensembl = biomaRt::useMart("ENSEMBL_MART_ENSEMBL", dataset = "mmusculus_gene_ensembl")
 attributes = biomaRt::listAttributes(ensembl)
@@ -297,7 +297,7 @@ PCA looks fine, samples separate as expected without huge batch effects except w
 
 First, we will compare naive to NPC, then naive to primed, then finally primed to NPC.
 
-```{r diff_exp}
+```{r diff_exp, cache = TRUE}
 
 sleuth_table_gene = list()
 
