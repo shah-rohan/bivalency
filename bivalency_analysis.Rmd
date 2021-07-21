@@ -21,6 +21,9 @@ This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the 
 
 ```{r data_loader, message = FALSE, warning = FALSE}
 
+library(topGO)
+library(GO.db)
+library(biomaRt)
 library(tidyverse)
 library(sleuth)
 
@@ -485,9 +488,6 @@ We can now move on to running gene ontology on our different bivalency classes. 
 
 ```{r gene_ontology_prep, message = FALSE, warning = FALSE}
 
-library(topGO)
-library(GO.db)
-
 ensembl_dominance = list()
 ensembl_dominance$k27 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k27) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
 ensembl_dominance$k4 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k4) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
@@ -541,9 +541,6 @@ go_classic_tables$mid = testGO(godata$mid)
 I don't know what to do here -- I guess pull out some of the terms that we looked at before?
 
 ```{r gene_ontology_terms_pvals, message = FALSE, warning = FALSE}
-
-library(biomaRt)
-detach(package:biomaRt, unload = TRUE)
 
 go_term_pvals = data.frame(GO.ID = c("GO:0032502", "GO:0009790", "GO:0019827", "GO:0030182", "GO:0008152", "GO:0002376"))
 go_term_pvals = go_term_pvals %>% inner_join(go_classic_tables$k27, by = "GO.ID") %>% select(GO.ID, Term, k27 = p.adj)
