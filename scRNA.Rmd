@@ -1,0 +1,27 @@
+---
+title: "scRNA"
+author: "Rohan Shah"
+date: "7/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Basic loading of kallisto data
+
+Here, we will load in the kallisto_quant data and generate a metadata table.
+
+```{r load_basics}
+
+library(tidyverse)
+library(sleuth)
+
+metadata = data.frame(sample = dir("kallisto_quant")) %>% separate(sample, c("cell_type", "rep"), sep = "_STAR_RNA-seq_", remove = FALSE) %>% mutate(cell_type = ifelse(cell_type == "2i", "mESC_with2i", "mESC_no2i")) %>% mutate(path = file.path("kallisto_quant", sample))
+
+t2g = read.table("t2g.tab", header = T, stringsAsFactors = TRUE)
+
+sleuth_all = sleuth_prep(metadata, target_mapping = t2g, aggregation_column = 'ext_gene', extra_bootstrap_summary = TRUE)
+
+```

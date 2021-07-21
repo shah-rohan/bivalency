@@ -488,25 +488,30 @@ We can now move on to running gene ontology on our different bivalency classes. 
 
 ```{r gene_ontology_prep, message = FALSE, warning = FALSE}
 
-ensembl_dominance = list()
-ensembl_dominance$k27 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k27) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
-ensembl_dominance$k4 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k4) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
-ensembl_dominance$mid = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$mid) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
-
-gene_2_go = unstack((refseq_ensembl_external_go %>% filter(ensembl_gene_id %in% ensembl_with_go))[,c(4,2)])
-
-genelists_ontology = list()
-genelists_ontology$k27 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k27))
-names(genelists_ontology$k27) = ensembl_with_go
-genelists_ontology$k4 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k4))
-names(genelists_ontology$k4) = ensembl_with_go
-genelists_ontology$mid = factor(as.integer(ensembl_with_go %in% ensembl_dominance$mid))
-names(genelists_ontology$mid) = ensembl_with_go
-
-godata = list()
-godata$k27 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k27, annot = annFUN.gene2GO, gene2GO = gene_2_go)
-godata$k4 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k4, annot = annFUN.gene2GO, gene2GO = gene_2_go)
-godata$mid = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$mid, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+if (!file.exists("go_struct.RData")){
+  ensembl_dominance = list()
+  ensembl_dominance$k27 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k27) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+  ensembl_dominance$k4 = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$k4) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+  ensembl_dominance$mid = (refseq_ensembl_external_go %>% filter(refseq_id %in% naive_dominance$mid) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+  
+  gene_2_go = unstack((refseq_ensembl_external_go %>% filter(ensembl_gene_id %in% ensembl_with_go))[,c(4,2)])
+  
+  genelists_ontology = list()
+  genelists_ontology$k27 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k27))
+  names(genelists_ontology$k27) = ensembl_with_go
+  genelists_ontology$k4 = factor(as.integer(ensembl_with_go %in% ensembl_dominance$k4))
+  names(genelists_ontology$k4) = ensembl_with_go
+  genelists_ontology$mid = factor(as.integer(ensembl_with_go %in% ensembl_dominance$mid))
+  names(genelists_ontology$mid) = ensembl_with_go
+  
+  godata = list()
+  godata$k27 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k27, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+  godata$k4 = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$k4, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+  godata$mid = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$mid, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+  save.image("go_struct.RData")
+} else {
+  load("go_struct.RData")
+}
 
 ```
 
@@ -589,3 +594,105 @@ metagene_plot(metagene(npc, tss_range, bivalent_loss_de_down), title = "Reverse 
 
 ```
 
+# Classification of genes
+
+This is essentially asking the final question about whether bivalency is actually an example of the "histone code." We will create a classification variable to identify whether a gene is developmentally regulated.
+
+```{r classifcation_setup}
+
+hmd_diffexp = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:logratio, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1))
+
+# Trivial Model
+summary(glm(diffexp ~ 1, data = hmd_diffexp, family = binomial))$aic
+
+# K4 only
+summary(glm(diffexp ~ k4, data = hmd_diffexp, family = binomial))$aic
+
+# K27 only
+summary(glm(diffexp ~ k27, data = hmd_diffexp, family = binomial))$aic
+
+# K9 only
+summary(glm(diffexp ~ k9, data = hmd_diffexp, family = binomial))$aic
+
+# trans only
+summary(glm(diffexp ~ trans, data = hmd_diffexp, family = binomial))$aic
+
+# K4 + K27
+summary(glm(diffexp ~ k4 + k27, data = hmd_diffexp, family = binomial))$aic
+
+# K4 + K27 + trans
+summary(glm(diffexp ~ k4 + k27 + trans, data = hmd_diffexp, family = binomial))$aic
+
+# K4 + K27 + log of each
+summary(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp, family = binomial))$aic
+
+# K4 + K27 + log of each + bivalency
+summary(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp, family = binomial))$aic
+
+```
+
+On the whole, we find that the model with K4 and K27 with logs of both minimizes AIC by 1.9, meaning that it is roughly 2.6x as likely to be the best model over the model with trans bivalency.
+
+We will now show the logistic regression therein.
+
+```{r logistic_regressions}
+
+glm_k4_k27_logs = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp, family = binomial)
+
+hmd_diffexp$predicted = predict(glm_k4_k27_logs, newdata = hmd_diffexp, type = "response")
+plot(x = hmd_diffexp$predicted, y = hmd_diffexp$diffexp)
+
+glm_k4_k27_logs_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp, family = binomial)
+
+hmd_diffexp$predicted_trans = predict(glm_k4_k27_logs_trans, newdata = hmd_diffexp, type = "response")
+plot(x = hmd_diffexp$predicted_trans, y = hmd_diffexp$diffexp)
+
+```
+
+This is still a very crappy measure, by all accounts. But it's less crappy without trans than with (or rather, it becomes less not-crappy with trans than expected by random chance). We can get the significance estimates for all these models.
+
+```{r logistic_regressions_summaries}
+
+# K4, K27, log K4, log K27
+summary(glm_k4_k27_logs)
+
+# K4, K27, log K4, log K27, trans
+summary(glm_k4_k27_logs_trans)
+
+```
+
+Of course, this should be done better. We will use training and testing data.
+
+```{r split_data}
+
+set.seed(1209)
+
+sample = sample.int(n = nrow(hmd_diffexp), size = floor(.7*nrow(hmd_diffexp)), replace = F)
+
+hmd_diffexp_train = hmd_diffexp[sample,]
+hmd_diffexp_test = hmd_diffexp[-sample,]
+
+glm_k4_k27_logs_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_train, family = binomial)
+glm_k4_k27_logs_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_train, family = binomial)
+glm_k4_k27_logs_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_train, family = binomial)
+
+hmd_diffexp_test$predicted = predict(glm_k4_k27_logs_train, newdata = hmd_diffexp_test, type = "response")
+hmd_diffexp_test$predicted_trans = predict(glm_k4_k27_logs_trans_train, newdata = hmd_diffexp_test, type = "response")
+hmd_diffexp_test$predicted_k9 = predict(glm_k4_k27_logs_k9_train, newdata = hmd_diffexp_test, type = "response")
+
+plot(x = hmd_diffexp_test$predicted, y = hmd_diffexp_test$diffexp)
+plot(x = hmd_diffexp_test$predicted_trans, y = hmd_diffexp_test$diffexp)
+plot(x = hmd_diffexp_test$predicted_k9, y = hmd_diffexp_test$diffexp)
+
+hmd_diffexp_test = hmd_diffexp_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
+
+mean(1==hmd_diffexp_test$diffexp)
+mean(hmd_diffexp_test$predicted_dir==hmd_diffexp_test$diffexp)
+mean(hmd_diffexp_test$predicted_dir_trans==hmd_diffexp_test$diffexp)
+mean(hmd_diffexp_test$predicted_dir_k9==hmd_diffexp_test$diffexp)
+
+```
+
+By the trivial model where we assume everything is differentially expressed, we find that we have an accuracy rate of 51.3%. By adding in a GLM for K4, K27, log K4, and log K27, we increase accuracy rate to 56.3%. By added in trans bivalency to the GLM on top of that, we only increase to accuracy rate to 56.4%, and to an even lesser degree than if we instead added in K9.
+
+Conclusion: bivalency does not provide us with more information about developmental staging of genes than do K4 and K27 alone.
