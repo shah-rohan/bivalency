@@ -550,3 +550,42 @@ go_term_pvals = go_term_pvals %>% inner_join(go_classic_tables$mid, by = "GO.ID"
 print(go_term_pvals)
 
 ```
+
+# Reverse feature search
+
+We haven't found any good features that are uniquely associated with bivalency, so I guess we're just going to go the opposite direction: look for genes that obey the classic paradigm of bivalency, then identify the features to which they belong. We will identify genes that are >25% bivalent in naive with < 10% bivalent in NPCs that are differentially expressed between the two.
+
+```{r reverse_feature_search}
+
+bivalent_loss = setdiff(bivalent_genes_25$naive, bivalent_genes_10$npc)
+bivalent_loss_de = (sleuth_table_gene$naive_npc %>% filter(qval <= 0.05) %>% filter(refseq_id %in% bivalent_loss))$refseq_id
+
+```
+
+There are only 432 Refseq IDs associated with classic features of bivalency. That's kind of sad. I guess we should do metagene profiles.
+
+```{r reverse_feature_metas}
+
+metagene_plot(metagene(naive, tss_range, bivalent_loss_de), title = "Reverse bivalency-associated feature search, naive cells")
+metagene_plot(metagene(primed, tss_range, bivalent_loss_de), title = "Reverse bivalency-associated feature search, primed cells")
+metagene_plot(metagene(npc, tss_range, bivalent_loss_de), title = "Reverse bivalency-associated feature search, NPC cells")
+
+```
+
+That looks like shit. Let's separate by upregulated and downregulated genes.
+
+```{r reverse_feature_updown_meta}
+
+bivalent_loss_de_up = bivalent_loss_de[bivalent_loss_de %in% upregulated_genes$naive_npc]
+bivalent_loss_de_down = bivalent_loss_de[bivalent_loss_de %in% downregulated_genes$naive_npc]
+
+metagene_plot(metagene(naive, tss_range, bivalent_loss_de_up), title = "Reverse bivalency-associated feature search, upregulated, naive cells")
+metagene_plot(metagene(primed, tss_range, bivalent_loss_de_up), title = "Reverse bivalency-associated feature search, upregulated, primed cells")
+metagene_plot(metagene(npc, tss_range, bivalent_loss_de_up), title = "Reverse bivalency-associated feature search, upregulated NPC cells")
+
+metagene_plot(metagene(naive, tss_range, bivalent_loss_de_down), title = "Reverse bivalency-associated feature search, downregulated, naive cells")
+metagene_plot(metagene(primed, tss_range, bivalent_loss_de_down), title = "Reverse bivalency-associated feature search, downregulated, primed cells")
+metagene_plot(metagene(npc, tss_range, bivalent_loss_de_down), title = "Reverse bivalency-associated feature search, downregulated NPC cells")
+
+```
+
