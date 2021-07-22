@@ -385,17 +385,24 @@ Having the above gene expression matrix, I want to examine the way in which gene
 
 ## Violin plots of gene expression
 
-First thing to do is to get the gene expression of the genes overall.
+First thing to do is to get the gene expression of the genes overall. We'll be doing this a lot, so we want to create a function to do it.
+
+```{r violin_function}
+
+violin_plot = function(gene_expression_df, filter_set = consensusGenes, title_text)
+{
+  violin_df = gene_expression_df %>% filter(refseq_id %in% filter_set) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = title_text)
+print(violin_plt)
+}
+
+```
 
 ```{r gene_expression_violin}
 
-violin_df = gene_expression %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at all genes in naive mESCs")
-print(violin_plt)
-
-rm(violin_df, violin_plt)
+violin_plot(gene_expression, title_text = "Gene expression at all genes in naive mESCs")
 
 ```
 
@@ -403,13 +410,7 @@ Next, we plot gene expression of bivalent genes in naive cells.
 
 ```{r gene_expression_naive_bivalent}
 
-violin_df = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at genes with >25% bivalency in naive mESCs")
-print(violin_plt)
-
-rm(violin_df, violin_plt)
+violin_plot(gene_expression, filter_set = bivalent_genes_25$naive, title_text = "Gene expression at genes with >25% bivalency in naive mESCs")
 
 ```
 
@@ -417,31 +418,21 @@ We see only subtle changes at best. Let us now section by K27 or K4 dominance.
 
 ```{r dominance_bivalent_gene_expression}
 
-violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$k27) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+violin_plot(gene_expression, filter_set = naive_dominance$k27, title_text = "Gene expression at K27 dominant bivalent genes in naive mESCs")
 
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at K27 dominant genes in naive mESCs")
-print(violin_plt)
+violin_plot(gene_expression, filter_set = (hmds$naive %>% filter(logratio > 1 & trans < 25))$Gene, title_text = "Gene expression at K27 dominant NON-bivalent genes in naive mESCs")
 
-rm(violin_df, violin_plt)
+violin_plot(gene_expression, filter_set = naive_dominance$k4, title_text = "Gene expression at K4 dominant bivalent genes in naive mESCs")
 
-violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$k4) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+violin_plot(gene_expression, filter_set = (hmds$naive %>% filter(logratio < -1 & trans < 25))$Gene, title_text = "Gene expression at K4 dominant NON-bivalent genes in naive mESCs")
 
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at K4 dominant genes in naive mESCs")
-print(violin_plt)
+violin_plot(gene_expression, filter_set = naive_dominance$mid, title_text = "Gene expression at mid dominant bivalent genes in naive mESCs")
 
-rm(violin_df, violin_plt)
-
-violin_df = gene_expression %>% filter(refseq_id %in% naive_dominance$mid) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = "Gene expression at mid dominant genes in naive mESCs")
-print(violin_plt)
-
-rm(violin_df, violin_plt)
+violin_plot(gene_expression, filter_set = (hmds$naive %>% filter(logratio < 1 & logratio > -1 & trans < 25))$Gene, title_text = "Gene expression at mid dominant NON-bivalent genes in naive mESCs")
 
 ```
+
+This is actually somewhat interesting. Dividing based on non-bivalent vs. bivalent genes, we see that K27 dominant bivalent genes actually do increase in expression over differentiation, but K27 dominant non-bivalent genes do not.
 
 The other thing that we can do here is to bin the naive mESC bivalent genes by gene expression, then track those subsets of genes across the differentiation pathway.
 
@@ -525,6 +516,25 @@ metagene_plot(metagene(npc, tss_range, nonregulated_genes$naive_npc), title = pa
 ```
 
 Minor differences in magnitude aside, there is basically no difference between the bivalency profiles of upregulated and downregulated genes.
+
+Given the above results, however, we have to do some overlap analysis between dominance classes and the differential expression classes.
+
+```{r dominance_diffexp}
+
+commonGenes = sleuth_table_gene$naive_npc$refseq_id[sleuth_table_gene$naive_npc$refseq_id %in% consensusGenes]
+
+print(paste0("Proportion of bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% bivalent_genes_25$naive %>% sum)/(bivalent_genes_25$naive %in% commonGenes %>% sum)))
+
+print(paste0("Proportion of K27 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$k27 %>% sum)/(naive_dominance$k27 %in% commonGenes %>% sum)))
+
+print(paste0("Proportion of K4 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$k4 %>% sum)/(naive_dominance$k4 %in% commonGenes %>% sum)))
+
+print(paste0("Proportion of mid dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$mid %>% sum)/(naive_dominance$mid %in% commonGenes %>% sum)))
+
+non_biv = setdiff(commonGenes, bivalent_genes_25$naive)
+print(paste0("Proportion of mid dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv %>% sum)/(non_biv %in% commonGenes %>% sum)))
+
+```
 
 # Gene ontology and bivalency classes
 
