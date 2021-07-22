@@ -598,54 +598,68 @@ metagene_plot(metagene(npc, tss_range, bivalent_loss_de_down), title = "Reverse 
 
 This is essentially asking the final question about whether bivalency is actually an example of the "histone code." We will create a classification variable to identify whether a gene is developmentally regulated.
 
+First we will look at naive to npc, then look at primed to npc.
+
+## Naive to NPC
+
 ```{r classifcation_setup}
 
-hmd_diffexp = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:logratio, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1))
+hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans)
+
+naive_npc_BICs = numeric()
 
 # Trivial Model
-summary(glm(diffexp ~ 1, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["trivial"] = BIC(glm(diffexp ~ 1, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 only
-summary(glm(diffexp ~ k4, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k4"] = BIC(glm(diffexp ~ k4, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K27 only
-summary(glm(diffexp ~ k27, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k27"] = BIC(glm(diffexp ~ k27, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K9 only
-summary(glm(diffexp ~ k9, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k9"] = BIC(glm(diffexp ~ k9, data = hmd_diffexp_naive_npc, family = binomial))
 
 # trans only
-summary(glm(diffexp ~ trans, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["trans"] = BIC(glm(diffexp ~ trans, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 + K27
-summary(glm(diffexp ~ k4 + k27, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k4_k27"] = BIC(glm(diffexp ~ k4 + k27, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 + K27 + trans
-summary(glm(diffexp ~ k4 + k27 + trans, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k4_k27_trans"] = BIC(glm(diffexp ~ k4 + k27 + trans, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 + K27 + log of each
-summary(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 + K27 + log of each + bivalency
-summary(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp, family = binomial))$aic
+naive_npc_BICs["k4_k27_logs_trans"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial))
+
+# log k4 + log k27
+naive_npc_BICs["logs"] = BIC(glm(diffexp ~ logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial))
+
+# log k4 + log k27
+naive_npc_BICs["logs_trans"] = BIC(glm(diffexp ~ logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial))
+
+print(naive_npc_BICs[order(naive_npc_BICs)])
 
 ```
 
-On the whole, we find that the model with K4 and K27 with logs of both minimizes AIC by 1.9, meaning that it is roughly 2.6x as likely to be the best model over the model with trans bivalency.
+On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by approximately 9.94, which is massive.
 
 We will now show the logistic regression therein.
 
 ```{r logistic_regressions}
 
-glm_k4_k27_logs = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp, family = binomial)
+glm_k4_k27_logs_naive_npc = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial)
 
-hmd_diffexp$predicted = predict(glm_k4_k27_logs, newdata = hmd_diffexp, type = "response")
-plot(x = hmd_diffexp$predicted, y = hmd_diffexp$diffexp)
+hmd_diffexp_naive_npc$predicted = predict(glm_k4_k27_logs_naive_npc, newdata = hmd_diffexp_naive_npc, type = "response")
+plot(x = hmd_diffexp_naive_npc$predicted, y = hmd_diffexp_naive_npc$diffexp)
 
-glm_k4_k27_logs_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp, family = binomial)
+glm_k4_k27_logs_naive_npc_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial)
 
-hmd_diffexp$predicted_trans = predict(glm_k4_k27_logs_trans, newdata = hmd_diffexp, type = "response")
-plot(x = hmd_diffexp$predicted_trans, y = hmd_diffexp$diffexp)
+hmd_diffexp_naive_npc$predicted_trans = predict(glm_k4_k27_logs_naive_npc_trans, newdata = hmd_diffexp_naive_npc, type = "response")
+plot(x = hmd_diffexp_naive_npc$predicted_trans, y = hmd_diffexp_naive_npc$diffexp)
 
 ```
 
@@ -654,10 +668,10 @@ This is still a very crappy measure, by all accounts. But it's less crappy witho
 ```{r logistic_regressions_summaries}
 
 # K4, K27, log K4, log K27
-summary(glm_k4_k27_logs)
+summary(glm_k4_k27_logs_naive_npc)
 
 # K4, K27, log K4, log K27, trans
-summary(glm_k4_k27_logs_trans)
+summary(glm_k4_k27_logs_naive_npc_trans)
 
 ```
 
@@ -667,32 +681,80 @@ Of course, this should be done better. We will use training and testing data.
 
 set.seed(1209)
 
-sample = sample.int(n = nrow(hmd_diffexp), size = floor(.7*nrow(hmd_diffexp)), replace = F)
+sample = sample.int(n = nrow(hmd_diffexp_naive_npc), size = floor(.7*nrow(hmd_diffexp_naive_npc)), replace = F)
 
-hmd_diffexp_train = hmd_diffexp[sample,]
-hmd_diffexp_test = hmd_diffexp[-sample,]
+hmd_diffexp_naive_npc_train = hmd_diffexp_naive_npc[sample,]
+hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc[-sample,]
 
-glm_k4_k27_logs_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_train, family = binomial)
-glm_k4_k27_logs_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_train, family = binomial)
-glm_k4_k27_logs_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_train, family = binomial)
+glm_k4_k27_logs_naive_npc_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc_train, family = binomial)
+glm_k4_k27_logs_naive_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc_train, family = binomial)
+glm_k4_k27_logs_naive_npc_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_naive_npc_train, family = binomial)
 
-hmd_diffexp_test$predicted = predict(glm_k4_k27_logs_train, newdata = hmd_diffexp_test, type = "response")
-hmd_diffexp_test$predicted_trans = predict(glm_k4_k27_logs_trans_train, newdata = hmd_diffexp_test, type = "response")
-hmd_diffexp_test$predicted_k9 = predict(glm_k4_k27_logs_k9_train, newdata = hmd_diffexp_test, type = "response")
+hmd_diffexp_naive_npc_test$predicted = predict(glm_k4_k27_logs_naive_npc_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
+hmd_diffexp_naive_npc_test$predicted_trans = predict(glm_k4_k27_logs_naive_npc_trans_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
+hmd_diffexp_naive_npc_test$predicted_k9 = predict(glm_k4_k27_logs_naive_npc_k9_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
 
-plot(x = hmd_diffexp_test$predicted, y = hmd_diffexp_test$diffexp)
-plot(x = hmd_diffexp_test$predicted_trans, y = hmd_diffexp_test$diffexp)
-plot(x = hmd_diffexp_test$predicted_k9, y = hmd_diffexp_test$diffexp)
+plot(x = hmd_diffexp_naive_npc_test$predicted, y = hmd_diffexp_naive_npc_test$diffexp)
+plot(x = hmd_diffexp_naive_npc_test$predicted_trans, y = hmd_diffexp_naive_npc_test$diffexp)
+plot(x = hmd_diffexp_naive_npc_test$predicted_k9, y = hmd_diffexp_naive_npc_test$diffexp)
 
-hmd_diffexp_test = hmd_diffexp_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
+hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
 
-mean(1==hmd_diffexp_test$diffexp)
-mean(hmd_diffexp_test$predicted_dir==hmd_diffexp_test$diffexp)
-mean(hmd_diffexp_test$predicted_dir_trans==hmd_diffexp_test$diffexp)
-mean(hmd_diffexp_test$predicted_dir_k9==hmd_diffexp_test$diffexp)
+mean(1==hmd_diffexp_naive_npc_test$diffexp)
+mean(hmd_diffexp_naive_npc_test$predicted_dir==hmd_diffexp_naive_npc_test$diffexp)
+mean(hmd_diffexp_naive_npc_test$predicted_dir_trans==hmd_diffexp_naive_npc_test$diffexp)
+mean(hmd_diffexp_naive_npc_test$predicted_dir_k9==hmd_diffexp_naive_npc_test$diffexp)
 
 ```
 
 By the trivial model where we assume everything is differentially expressed, we find that we have an accuracy rate of 51.3%. By adding in a GLM for K4, K27, log K4, and log K27, we increase accuracy rate to 56.3%. By added in trans bivalency to the GLM on top of that, we only increase to accuracy rate to 56.4%, and to an even lesser degree than if we instead added in K9.
 
 Conclusion: bivalency does not provide us with more information about developmental staging of genes than do K4 and K27 alone.
+
+## Primed to NPC
+
+```{r classifcation_setup}
+
+hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans)
+
+primed_npc_BICs = numeric()
+
+# Trivial Model
+primed_npc_BICs["trivial"] = BIC(glm(diffexp ~ 1, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 only
+primed_npc_BICs["k4"] = BIC(glm(diffexp ~ k4, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K27 only
+primed_npc_BICs["k27"] = BIC(glm(diffexp ~ k27, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K9 only
+primed_npc_BICs["k9"] = BIC(glm(diffexp ~ k9, data = hmd_diffexp_primed_npc, family = binomial))
+
+# trans only
+primed_npc_BICs["trans"] = BIC(glm(diffexp ~ trans, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27
+primed_npc_BICs["k4_k27"] = BIC(glm(diffexp ~ k4 + k27, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27 + trans
+primed_npc_BICs["k4_k27_trans"] = BIC(glm(diffexp ~ k4 + k27 + trans, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27 + log of each
+primed_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27 + log of each + bivalency
+primed_npc_BICs["k4_k27_logs_trans"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_primed_npc, family = binomial))
+
+# log k4 + log k27
+primed_npc_BICs["logs"] = BIC(glm(diffexp ~ logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial))
+
+# log k4 + log k27
+primed_npc_BICs["logs_trans"] = BIC(glm(diffexp ~ logk4 + logk27 + trans, data = hmd_diffexp_primed_npc, family = binomial))
+
+print(primed_npc_BICs[order(primed_npc_BICs)])
+
+```
+
+Here, we find that the model with logs of k4 and k27 is better than that with logs and trans by 2.55.
+
