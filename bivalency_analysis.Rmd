@@ -287,6 +287,8 @@ for (go_term in names(go_ids))
   metagene_plot(metagene(npc, tss_range, overlapgenes), title = paste0("NPC cells at naive 25% bivalent genes HMD in GO term ", go_term, " (", count_genes, " genes)"))
 }
 
+rm(count_genes)
+
 ```
 
 Across the different GO term classes, bivalent genes remain bivalent. 
@@ -460,6 +462,48 @@ rm(gene_expression_bivalent, countup, violin_df, violin_plt)
 
 ```
 
+We will section more coarsely to cut off at above and below -3 for log10_tpm.
+
+```{r section_gene_expression_coarse}
+
+gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
+violin_df = gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive>=-3) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+  
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
+print(violin_plt)
+
+violin_df = gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive< -3) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+  
+violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
+print(violin_plt)
+
+```
+
+I don't really know what to say, it looks basically the same there.
+
+To check if the quintiles spread is real effect or just due to chance, I will do the same thing, but working off quintiles for npc instead.
+
+```{r section_by_gene_expression_npc}
+
+for (i in 1:5)
+{
+  gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
+  countup = floor(length(gene_expression_bivalent$naive)/5)
+  violin_df = gene_expression_bivalent %>% arrange(desc(npc)) %>%  slice((countup*(i-1)):(countup*i - 1)) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+  violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+  
+  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
+  print(violin_plt)
+}
+
+rm(gene_expression_bivalent, countup, violin_df, violin_plt)
+
+```
+
+Okay it looks very similar, I will take that to mean that it's just chance.
+
 ## Metaprofiles by gene expression
 
 The other obvious thing is to look at upregulated genes, downregulated genes, and insignificantly changed genes to look at bivalency metaprofiles there.
@@ -594,6 +638,53 @@ metagene_plot(metagene(npc, tss_range, bivalent_loss_de_down), title = "Reverse 
 
 ```
 
+It continues to look like shit. Let's look at the gene ontology classes here.
+
+```{r reverse_feature_gene_ontology}
+
+bivalent_loss_de_ensembl = (refseq_ensembl_external_go %>% filter(refseq_id %in% bivalent_loss_de) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+
+genelists_ontology$biv_loss_de = factor(as.integer(ensembl_with_go %in% bivalent_loss_de_ensembl))
+names(genelists_ontology$biv_loss_de) = ensembl_with_go
+
+godata$biv_loss_de = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$biv_loss_de, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+
+go_classic_tables$biv_loss_de = testGO(godata$biv_loss_de)
+
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+
+```
+
+It's enriched overwhelmingly for metabolic processes. Now we will do the same thing, but up and down.
+
+```{r reverse_feature_gene_ontology}
+
+bivalent_loss_de_up_ensembl = (refseq_ensembl_external_go %>% filter(refseq_id %in% bivalent_loss_de_up) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+
+genelists_ontology$biv_loss_de_up = factor(as.integer(ensembl_with_go %in% bivalent_loss_de_up_ensembl))
+names(genelists_ontology$biv_loss_de_up) = ensembl_with_go
+
+godata$biv_loss_de_up = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$biv_loss_de_up, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+
+go_classic_tables$biv_loss_de_up = testGO(godata$biv_loss_de_up)
+
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_up, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+
+bivalent_loss_de_down_ensembl = (refseq_ensembl_external_go %>% filter(refseq_id %in% bivalent_loss_de_down) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
+
+genelists_ontology$biv_loss_de_down = factor(as.integer(ensembl_with_go %in% bivalent_loss_de_down_ensembl))
+names(genelists_ontology$biv_loss_de_down) = ensembl_with_go
+
+godata$biv_loss_de_down = new('topGOdata', ontology = 'BP', allGenes = genelists_ontology$biv_loss_de_down, annot = annFUN.gene2GO, gene2GO = gene_2_go)
+
+go_classic_tables$biv_loss_de_down = testGO(godata$biv_loss_de_down)
+
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_down, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+
+```
+
+Okay, in both terms, the only significant top-level term is metabolic processes.
+
 # Classification of genes
 
 This is essentially asking the final question about whether bivalency is actually an example of the "histone code." We will create a classification variable to identify whether a gene is developmentally regulated.
@@ -604,7 +695,7 @@ First we will look at naive to npc, then look at primed to npc.
 
 ```{r classifcation_setup}
 
-hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans)
+hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans)
 
 naive_npc_BICs = numeric()
 
@@ -633,39 +724,21 @@ naive_npc_BICs["k4_k27_trans"] = BIC(glm(diffexp ~ k4 + k27 + trans, data = hmd_
 naive_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial))
 
 # K4 + K27 + log of each + bivalency
-naive_npc_BICs["k4_k27_logs_trans"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial))
-
-# log k4 + log k27
-naive_npc_BICs["logs"] = BIC(glm(diffexp ~ logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial))
-
-# log k4 + log k27
-naive_npc_BICs["logs_trans"] = BIC(glm(diffexp ~ logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial))
+naive_npc_BICs["k4_k27_trans_logs"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans, data = hmd_diffexp_naive_npc, family = binomial))
 
 print(naive_npc_BICs[order(naive_npc_BICs)])
 
 ```
 
-On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by approximately 9.94, which is massive.
+On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by 18.21, which is massive.
 
-We will now show the logistic regression therein.
+Full summary of top two models:
 
-```{r logistic_regressions}
+```{r logistic_regressions_summaries}
 
 glm_k4_k27_logs_naive_npc = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc, family = binomial)
 
-hmd_diffexp_naive_npc$predicted = predict(glm_k4_k27_logs_naive_npc, newdata = hmd_diffexp_naive_npc, type = "response")
-plot(x = hmd_diffexp_naive_npc$predicted, y = hmd_diffexp_naive_npc$diffexp)
-
-glm_k4_k27_logs_naive_npc_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc, family = binomial)
-
-hmd_diffexp_naive_npc$predicted_trans = predict(glm_k4_k27_logs_naive_npc_trans, newdata = hmd_diffexp_naive_npc, type = "response")
-plot(x = hmd_diffexp_naive_npc$predicted_trans, y = hmd_diffexp_naive_npc$diffexp)
-
-```
-
-This is still a very crappy measure, by all accounts. But it's less crappy without trans than with (or rather, it becomes less not-crappy with trans than expected by random chance). We can get the significance estimates for all these models.
-
-```{r logistic_regressions_summaries}
+glm_k4_k27_logs_naive_npc_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_naive_npc, family = binomial)
 
 # K4, K27, log K4, log K27
 summary(glm_k4_k27_logs_naive_npc)
@@ -687,7 +760,7 @@ hmd_diffexp_naive_npc_train = hmd_diffexp_naive_npc[sample,]
 hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc[-sample,]
 
 glm_k4_k27_logs_naive_npc_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc_train, family = binomial)
-glm_k4_k27_logs_naive_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_naive_npc_train, family = binomial)
+glm_k4_k27_logs_naive_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_naive_npc_train, family = binomial)
 glm_k4_k27_logs_naive_npc_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_naive_npc_train, family = binomial)
 
 hmd_diffexp_naive_npc_test$predicted = predict(glm_k4_k27_logs_naive_npc_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
@@ -707,15 +780,13 @@ mean(hmd_diffexp_naive_npc_test$predicted_dir_k9==hmd_diffexp_naive_npc_test$dif
 
 ```
 
-By the trivial model where we assume everything is differentially expressed, we find that we have an accuracy rate of 51.3%. By adding in a GLM for K4, K27, log K4, and log K27, we increase accuracy rate to 56.3%. By added in trans bivalency to the GLM on top of that, we only increase to accuracy rate to 56.4%, and to an even lesser degree than if we instead added in K9.
-
-Conclusion: bivalency does not provide us with more information about developmental staging of genes than do K4 and K27 alone.
+By the trivial model where we assume everything is differentially expressed, we find that we have an accuracy rate of 51.3%. By adding in a GLM for K4, K27, log K4, and log K27, we increase accuracy rate to 56.3%. By added in trans bivalency (and log therein) to the GLM on top of that, we only increase to accuracy rate to 56.4%, and to an even lesser degree than if we instead added in K9.
 
 ## Primed to NPC
 
 ```{r classifcation_setup}
 
-hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans)
+hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
 
 primed_npc_BICs = numeric()
 
@@ -744,13 +815,7 @@ primed_npc_BICs["k4_k27_trans"] = BIC(glm(diffexp ~ k4 + k27 + trans, data = hmd
 primed_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial))
 
 # K4 + K27 + log of each + bivalency
-primed_npc_BICs["k4_k27_logs_trans"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans, data = hmd_diffexp_primed_npc, family = binomial))
-
-# log k4 + log k27
-primed_npc_BICs["logs"] = BIC(glm(diffexp ~ logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial))
-
-# log k4 + log k27
-primed_npc_BICs["logs_trans"] = BIC(glm(diffexp ~ logk4 + logk27 + trans, data = hmd_diffexp_primed_npc, family = binomial))
+primed_npc_BICs["k4_k27_trans_logs"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans, data = hmd_diffexp_primed_npc, family = binomial))
 
 print(primed_npc_BICs[order(primed_npc_BICs)])
 
@@ -758,3 +823,58 @@ print(primed_npc_BICs[order(primed_npc_BICs)])
 
 Here, we find that the model with logs of k4 and k27 is better than that with logs and trans by 2.55.
 
+Full summary of top two models:
+
+```{r logistic_regressions_summaries}
+
+glm_k4_k27_logs_primed_npc = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial)
+
+glm_k4_k27_logs_primed_npc_trans = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_primed_npc, family = binomial)
+
+# K4, K27, log K4, log K27
+summary(glm_k4_k27_logs_primed_npc)
+
+# K4, K27, log K4, log K27, trans
+summary(glm_k4_k27_logs_primed_npc_trans)
+
+```
+
+Of course, this should be done better. We will use training and testing data.
+
+```{r split_data}
+
+set.seed(1209)
+
+sample = sample.int(n = nrow(hmd_diffexp_primed_npc), size = floor(.7*nrow(hmd_diffexp_primed_npc)), replace = F)
+
+hmd_diffexp_primed_npc_train = hmd_diffexp_primed_npc[sample,]
+hmd_diffexp_primed_npc_test = hmd_diffexp_primed_npc[-sample,]
+
+glm_k4_k27_logs_primed_npc_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc_train, family = binomial)
+glm_k4_k27_logs_primed_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_primed_npc_train, family = binomial)
+glm_k4_k27_logs_primed_npc_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_primed_npc_train, family = binomial)
+
+hmd_diffexp_primed_npc_test$predicted = predict(glm_k4_k27_logs_primed_npc_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
+hmd_diffexp_primed_npc_test$predicted_trans = predict(glm_k4_k27_logs_primed_npc_trans_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
+hmd_diffexp_primed_npc_test$predicted_k9 = predict(glm_k4_k27_logs_primed_npc_k9_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
+
+plot(x = hmd_diffexp_primed_npc_test$predicted, y = hmd_diffexp_primed_npc_test$diffexp)
+plot(x = hmd_diffexp_primed_npc_test$predicted_trans, y = hmd_diffexp_primed_npc_test$diffexp)
+plot(x = hmd_diffexp_primed_npc_test$predicted_k9, y = hmd_diffexp_primed_npc_test$diffexp)
+
+hmd_diffexp_primed_npc_test = hmd_diffexp_primed_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
+
+mean(0==hmd_diffexp_primed_npc_test$diffexp)
+mean(hmd_diffexp_primed_npc_test$predicted_dir==hmd_diffexp_primed_npc_test$diffexp)
+mean(hmd_diffexp_primed_npc_test$predicted_dir_trans==hmd_diffexp_primed_npc_test$diffexp)
+mean(hmd_diffexp_primed_npc_test$predicted_dir_k9==hmd_diffexp_primed_npc_test$diffexp)
+
+```
+
+By the trivial model where we assume nothing is differentially expressed, we have a 66.8% accuracy rate. This rate is 66.73% with the model without trans, and 66.76% with the model with trans. Adding in k9 instead of trans and logtrans here brings the accuracy rate down to 66.69%.
+
+Conclusion: bivalency does not provide us with more information about developmental staging of genes than do K4 and K27 alone.
+
+# Fisher Hypergeometric Tests for Overlap
+
+In this section, we will look for overlap with existing datasets.
