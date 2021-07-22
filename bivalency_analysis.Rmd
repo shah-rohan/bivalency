@@ -3,8 +3,8 @@ title: "bivalency_analysis"
 author: "Rohan Shah"
 date: "7/15/2021"
 output:
-  html_document: default
-  pdf_document: default
+  html_document:
+    toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -651,13 +651,13 @@ godata$biv_loss_de = new('topGOdata', ontology = 'BP', allGenes = genelists_onto
 
 go_classic_tables$biv_loss_de = testGO(godata$biv_loss_de)
 
-go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de, by = "GO.ID") %>% select(GO.ID, Term = Term.x, p.adj)
 
 ```
 
 It's enriched overwhelmingly for metabolic processes. Now we will do the same thing, but up and down.
 
-```{r reverse_feature_gene_ontology}
+```{r reverse_feature_gene_ontology_updown}
 
 bivalent_loss_de_up_ensembl = (refseq_ensembl_external_go %>% filter(refseq_id %in% bivalent_loss_de_up) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
 
@@ -668,7 +668,7 @@ godata$biv_loss_de_up = new('topGOdata', ontology = 'BP', allGenes = genelists_o
 
 go_classic_tables$biv_loss_de_up = testGO(godata$biv_loss_de_up)
 
-go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_up, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_up, by = "GO.ID") %>% select(GO.ID, Term = Term.x, p.adj)
 
 bivalent_loss_de_down_ensembl = (refseq_ensembl_external_go %>% filter(refseq_id %in% bivalent_loss_de_down) %>% filter(ensembl_gene_id %in% ensembl_with_go))$ensembl_gene_id %>% unique
 
@@ -679,7 +679,7 @@ godata$biv_loss_de_down = new('topGOdata', ontology = 'BP', allGenes = genelists
 
 go_classic_tables$biv_loss_de_down = testGO(godata$biv_loss_de_down)
 
-go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_down, by = "GO.ID") %>% select(GO.ID, Term, p.adj)
+go_term_pvals %>% inner_join(go_classic_tables$biv_loss_de_down, by = "GO.ID") %>% select(GO.ID, Term = Term.x, p.adj)
 
 ```
 
@@ -784,7 +784,7 @@ By the trivial model where we assume everything is differentially expressed, we 
 
 ## Primed to NPC
 
-```{r classifcation_setup}
+```{r classifcation_setup_primed}
 
 hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
 
@@ -825,7 +825,7 @@ Here, we find that the model with logs of k4 and k27 is better than that with lo
 
 Full summary of top two models:
 
-```{r logistic_regressions_summaries}
+```{r logistic_regressions_summaries_primed}
 
 glm_k4_k27_logs_primed_npc = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc, family = binomial)
 
@@ -841,7 +841,7 @@ summary(glm_k4_k27_logs_primed_npc_trans)
 
 Of course, this should be done better. We will use training and testing data.
 
-```{r split_data}
+```{r split_data_primed}
 
 set.seed(1209)
 
@@ -878,3 +878,77 @@ Conclusion: bivalency does not provide us with more information about developmen
 # Fisher Hypergeometric Tests for Overlap
 
 In this section, we will look for overlap with existing datasets.
+
+First, we will look at the Mikkelsen, Xiao, and Mas bivalent genes as defined by ouranalysis et al., with overlap from -2.5kb to the end of the gene.
+
+```{r overlap_ouranalysis}
+
+ouranalysis = list()
+ouranalysis$mikkelsen = read.table("full_genes/Bivalent_refseq_Mikkelsen.bed", stringsAsFactors = F, header = F)$V4
+ouranalysis$mas = read.table("full_genes/Bivalent_refseq_Mas.bed", stringsAsFactors = F, header = F)$V4
+ouranalysis$xiao = read.table("full_genes/Bivalent_refseq_Xiao.bed", stringsAsFactors = F, header = F)$V4
+
+ouranalysis_fisher = list()
+
+for (i in names(ouranalysis))
+{
+  in_both = bivalent_genes_25$naive %in% ouranalysis[[i]] %>% sum
+  only_naive = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]]) %>% length
+  only_ouranalysis = setdiff(ouranalysis[[i]], bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]) %>% length
+  in_neither = length(consensusGenes) - only_naive - only_ouranalysis + in_both
+  print(i)
+  print(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2))
+  ouranalysis_fisher[[i]] = fisher.test(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2), alternative = "greater")
+  print(phyper(in_both, length(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]), length(setdiff(consensusGenes, bivalent_genes_25$naive)), length(ouranalysis[[i]]), lower.tail = FALSE))
+  
+  metagene_plot(metagene(naive, tss_range, ouranalysis[[i]]), title = paste0("Naive cells at bivalent genes from ouranalysis analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, ouranalysis[[i]]), title = paste0("Primed cells at bivalent genes from ouranalysis analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, ouranalysis[[i]]), title = paste0("NPC cells at bivalent genes from ouranalysis analysis of ", i))
+  
+  naive_not_i = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]])
+  metagene_plot(metagene(naive, tss_range, naive_not_i), title = paste0("Naive cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, naive_not_i), title = paste0("Primed cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, naive_not_i), title = paste0("NPC cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
+  
+  rm(in_both, in_neither, only_ouranalysis, only_naive, naive_not_i)
+}
+
+```
+
+Overwhelmingly, it seems clear that everyone else only looked at the most strongly H3K27me3-dominant genes by the ouranalysis reanalysis. Now we will look using our metric, where we only consider it if there is both H3K4me3 and H3K27me3 peak overlapping the +1/+2 nucleosomes.
+
+```{r overlap_ouranalyasis}
+
+ouranalysis = list()
+ouranalysis$mikkelsen = read.table("refseq_promoter/Bivalent_refseq_promoter_Mikkelsen.tab", stringsAsFactors = F, header = F)$V4
+ouranalysis$mas = read.table("refseq_promoter/Bivalent_refseq_promoter_Mas.tab", stringsAsFactors = F, header = F)$V4
+ouranalysis$xiao = read.table("refseq_promoter/Bivalent_refseq_promoter_Xiao.tab", stringsAsFactors = F, header = F)$V4
+
+ouranalysis_fisher = list()
+
+for (i in names(ouranalysis))
+{
+  in_both = bivalent_genes_25$naive %in% ouranalysis[[i]] %>% sum
+  only_naive = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]]) %>% length
+  only_ouranalysis = setdiff(ouranalysis[[i]], bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]) %>% length
+  in_neither = length(consensusGenes) - only_naive - only_ouranalysis + in_both
+  print(i)
+  print(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2))
+  ouranalysis_fisher[[i]] = fisher.test(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2), alternative = "greater")
+  print(phyper(in_both, length(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]), length(setdiff(consensusGenes, bivalent_genes_25$naive)), length(ouranalysis[[i]]), lower.tail = FALSE))
+  
+  metagene_plot(metagene(naive, tss_range, ouranalysis[[i]]), title = paste0("Naive cells at bivalent genes from our analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, ouranalysis[[i]]), title = paste0("Primed cells at bivalent genes from our analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, ouranalysis[[i]]), title = paste0("NPC cells at bivalent genes from our analysis of ", i))
+  
+  naive_not_i = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]])
+  metagene_plot(metagene(naive, tss_range, naive_not_i), title = paste0("Naive cells at naive bivalent genes NOT from our analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, naive_not_i), title = paste0("Primed cells at naive bivalent genes NOT from our analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, naive_not_i), title = paste0("NPC cells at naive bivalent genes NOT from our analysis of ", i))
+  
+  rm(in_both, in_neither, only_ouranalysis, only_naive, naive_not_i)
+}
+
+```
+
+Again, they're just looking at the H3K27me3-dominated class of genes.
