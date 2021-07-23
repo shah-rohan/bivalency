@@ -705,7 +705,7 @@ First we will look at naive to npc, then look at primed to npc.
 
 ```{r classifcation_setup}
 
-hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans)
+hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
 
 naive_npc_BICs = numeric()
 
@@ -962,3 +962,51 @@ for (i in names(ouranalysis))
 ```
 
 Again, they're just looking at the H3K27me3-dominated class of genes.
+
+# Receiver Operator Characteristic Curves
+
+In this section, we will use our diffexp data frames to create receiver operator characteristic curves. As usual, we will first create functions; these will output the area under the curve.
+
+```{r roc_curves_functions}
+
+library(wesanderson)
+
+pal = wes_palette("Zissou1", type = "continuous")
+
+simple_roc = function(labels, hmds, rev = F)
+{
+  df = data.frame(labs = labels, hmd = hmds)
+  roc_df = df %>% mutate(hmd = ifelse(hmd<0, 0, hmd)) %>% mutate(hmd = ifelse(hmd>100, 100, hmd)) %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
+  roc_df$tpr = roc_df$tps/sum(roc_df$tp)
+  roc_df$fpr = roc_df$fps/sum(roc_df$fp)
+  
+  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_line(size=1) + scale_color_gradientn(colors = pal, limits = c(0, 100)) + theme_classic()
+  print(roc_plt)
+  
+  auc_df = roc_df %>% tail(-1)
+  auc_df$fpr_diff = auc_df$fpr - head(roc_df, -1)$fpr
+  auc_df$area_diff = auc_df$fpr_diff*auc_df$tpr
+  
+  return(sum(auc_df$area_diff))
+}
+
+simple_roc_logs = function(labels, hmds, rev = F)
+{
+  df = data.frame(labs = labels, hmd = hmds)
+  roc_df = df %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
+  roc_df$tpr = roc_df$tps/sum(roc_df$tp)
+  roc_df$fpr = roc_df$fps/sum(roc_df$fp)
+  
+  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_line(size=1) + scale_color_gradientn(colors = pal) + theme_classic()
+  print(roc_plt)
+  
+  auc_df = roc_df %>% tail(-1)
+  auc_df$fpr_diff = auc_df$fpr - head(roc_df, -1)$fpr
+  auc_df$area_diff = auc_df$fpr_diff*auc_df$tpr
+  
+  return(sum(auc_df$area_diff))
+}
+
+```
+
+TODO: Add ROCs for all the mods and for the different linear models.
