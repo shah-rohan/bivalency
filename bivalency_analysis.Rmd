@@ -17,7 +17,7 @@ This R Markdown file is meant to streamline the analysis of the bivalency data a
 
 ## Data loading
 
-This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries.
+This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries. NEW: It also conducts signal correction for H3K9me3 on the trans bivalency dataset.
 
 ```{r data_loader, message = FALSE, warning = FALSE}
 
@@ -74,6 +74,14 @@ sleuth_objs[["primed_npc"]] = so_primed_npc
 rm(so_all, so_naive_npc, so_naive_primed, so_primed_npc)
 
 rm(metadata_naive_npc, metadata_naive_primed, metadata_primed_npc)
+
+specificities = read.table("off_target.txt", header = T, row.names = 1)
+
+hmds$naive = hmds$naive %>% mutate(trans = (trans - specificities["naive",]$trans_ip_k9 * k9)/(1 - specificities["naive",]$trans_ip_k9*specificities["naive",]$k9_ip_trans))
+hmds$primed = hmds$primed %>% mutate(trans = (trans - specificities["primed",]$trans_ip_k9 * k9)/(1 - specificities["primed",]$trans_ip_k9*specificities["primed",]$k9_ip_trans))
+hmds$npc = hmds$npc %>% mutate(trans = (trans - specificities["npc",]$trans_ip_k9 * k9)/(1 - specificities["npc",]$trans_ip_k9*specificities["npc",]$k9_ip_trans))
+
+rm(specificities)
 
 ```
 
@@ -621,7 +629,7 @@ bivalent_loss_de = (sleuth_table_gene$naive_npc %>% filter(qval <= 0.05) %>% fil
 
 ```
 
-There are only 432 Refseq IDs associated with classic features of bivalency. That's kind of sad. I guess we should do metagene profiles.
+There are only 573 Refseq IDs associated with classic features of bivalency. That's kind of sad. I guess we should do metagene profiles.
 
 ```{r reverse_feature_metas}
 
@@ -705,7 +713,11 @@ First we will look at naive to npc, then look at primed to npc.
 
 ```{r classifcation_setup}
 
+<<<<<<< Updated upstream
 hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
+=======
+hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1)), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans)
+>>>>>>> Stashed changes
 
 naive_npc_BICs = numeric()
 
@@ -740,7 +752,7 @@ print(naive_npc_BICs[order(naive_npc_BICs)])
 
 ```
 
-On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by 18.21, which is massive.
+On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by approximately 14.
 
 Full summary of top two models:
 
@@ -796,7 +808,7 @@ By the trivial model where we assume everything is differentially expressed, we 
 
 ```{r classifcation_setup_primed}
 
-hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
+hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1))) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
 
 primed_npc_BICs = numeric()
 
@@ -831,7 +843,7 @@ print(primed_npc_BICs[order(primed_npc_BICs)])
 
 ```
 
-Here, we find that the model with logs of k4 and k27 is better than that with logs and trans by 2.55.
+Here, we find that the model with logs of k4 and k27 is better than that with logs and trans by just a hair.
 
 Full summary of top two models:
 
@@ -891,36 +903,36 @@ In this section, we will look for overlap with existing datasets.
 
 First, we will look at the Mikkelsen, Xiao, and Mas bivalent genes as defined by ouranalysis et al., with overlap from -2.5kb to the end of the gene.
 
-```{r overlap_ouranalysis}
+```{r overlap_blanco}
 
-ouranalysis = list()
-ouranalysis$mikkelsen = read.table("full_genes/Bivalent_refseq_Mikkelsen.bed", stringsAsFactors = F, header = F)$V4
-ouranalysis$mas = read.table("full_genes/Bivalent_refseq_Mas.bed", stringsAsFactors = F, header = F)$V4
-ouranalysis$xiao = read.table("full_genes/Bivalent_refseq_Xiao.bed", stringsAsFactors = F, header = F)$V4
+blanco = list()
+blanco$mikkelsen = read.table("full_genes/Bivalent_refseq_Mikkelsen.bed", stringsAsFactors = F, header = F)$V4
+blanco$mas = read.table("full_genes/Bivalent_refseq_Mas.bed", stringsAsFactors = F, header = F)$V4
+blanco$xiao = read.table("full_genes/Bivalent_refseq_Xiao.bed", stringsAsFactors = F, header = F)$V4
 
-ouranalysis_fisher = list()
+blanco_fisher = list()
 
-for (i in names(ouranalysis))
+for (i in names(blanco))
 {
-  in_both = bivalent_genes_25$naive %in% ouranalysis[[i]] %>% sum
-  only_naive = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]]) %>% length
-  only_ouranalysis = setdiff(ouranalysis[[i]], bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]) %>% length
-  in_neither = length(consensusGenes) - only_naive - only_ouranalysis + in_both
+  in_both = bivalent_genes_25$naive %in% blanco[[i]] %>% sum
+  only_naive = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], blanco[[i]]) %>% length
+  only_blanco = setdiff(blanco[[i]], bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]) %>% length
+  in_neither = length(consensusGenes) - only_naive - only_blanco + in_both
   print(i)
-  print(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2))
-  ouranalysis_fisher[[i]] = fisher.test(matrix(c(in_both, only_naive, only_ouranalysis, in_neither), nr = 2), alternative = "greater")
-  print(phyper(in_both, length(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]), length(setdiff(consensusGenes, bivalent_genes_25$naive)), length(ouranalysis[[i]]), lower.tail = FALSE))
+  print(matrix(c(in_both, only_naive, only_blanco, in_neither), nr = 2))
+  blanco_fisher[[i]] = fisher.test(matrix(c(in_both, only_naive, only_blanco, in_neither), nr = 2), alternative = "greater")
+  print(phyper(in_both, length(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]), length(setdiff(consensusGenes, bivalent_genes_25$naive)), length(blanco[[i]]), lower.tail = FALSE))
   
-  metagene_plot(metagene(naive, tss_range, ouranalysis[[i]]), title = paste0("Naive cells at bivalent genes from ouranalysis analysis of ", i))
-  metagene_plot(metagene(primed, tss_range, ouranalysis[[i]]), title = paste0("Primed cells at bivalent genes from ouranalysis analysis of ", i))
-  metagene_plot(metagene(npc, tss_range, ouranalysis[[i]]), title = paste0("NPC cells at bivalent genes from ouranalysis analysis of ", i))
+  metagene_plot(metagene(naive, tss_range, blanco[[i]]), title = paste0("Naive cells at bivalent genes from blanco analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, blanco[[i]]), title = paste0("Primed cells at bivalent genes from blanco analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, blanco[[i]]), title = paste0("NPC cells at bivalent genes from blanco analysis of ", i))
   
-  naive_not_i = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], ouranalysis[[i]])
-  metagene_plot(metagene(naive, tss_range, naive_not_i), title = paste0("Naive cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
-  metagene_plot(metagene(primed, tss_range, naive_not_i), title = paste0("Primed cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
-  metagene_plot(metagene(npc, tss_range, naive_not_i), title = paste0("NPC cells at naive bivalent genes NOT from ouranalysis analysis of ", i))
+  naive_not_i = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], blanco[[i]])
+  metagene_plot(metagene(naive, tss_range, naive_not_i), title = paste0("Naive cells at naive bivalent genes NOT from blanco analysis of ", i))
+  metagene_plot(metagene(primed, tss_range, naive_not_i), title = paste0("Primed cells at naive bivalent genes NOT from blanco analysis of ", i))
+  metagene_plot(metagene(npc, tss_range, naive_not_i), title = paste0("NPC cells at naive bivalent genes NOT from blanco analysis of ", i))
   
-  rm(in_both, in_neither, only_ouranalysis, only_naive, naive_not_i)
+  rm(in_both, in_neither, only_blanco, only_naive, naive_not_i)
 }
 
 ```
