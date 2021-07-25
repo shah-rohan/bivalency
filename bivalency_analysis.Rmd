@@ -538,15 +538,32 @@ Given the above results, however, we have to do some overlap analysis between do
 commonGenes = sleuth_table_gene$naive_npc$refseq_id[sleuth_table_gene$naive_npc$refseq_id %in% consensusGenes]
 
 print(paste0("Proportion of bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% bivalent_genes_25$naive %>% sum)/(bivalent_genes_25$naive %in% commonGenes %>% sum)))
+print(paste0("Number of bivalent genes that are DE: ", (bivalent_genes_25$naive %in% commonGenes %>% sum)- (nonregulated_genes$naive_npc %in% bivalent_genes_25$naive %>% sum)))
 
 print(paste0("Proportion of K27 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$k27 %>% sum)/(naive_dominance$k27 %in% commonGenes %>% sum)))
+print(paste0("Number of K27 dom bivalent genes that are DE: ", (naive_dominance$k27 %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% naive_dominance$k27 %>% sum)))
 
 print(paste0("Proportion of K4 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$k4 %>% sum)/(naive_dominance$k4 %in% commonGenes %>% sum)))
+print(paste0("Number of K4 dom bivalent genes that are DE: ", (naive_dominance$k4 %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% naive_dominance$k4 %>% sum)))
 
 print(paste0("Proportion of mid dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% naive_dominance$mid %>% sum)/(naive_dominance$mid %in% commonGenes %>% sum)))
+print(paste0("Number of mid dom bivalent genes that are DE: ", (naive_dominance$mid %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% naive_dominance$mid %>% sum)))
 
 non_biv = setdiff(commonGenes, bivalent_genes_25$naive)
-print(paste0("Proportion of mid dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv %>% sum)/(non_biv %in% commonGenes %>% sum)))
+print(paste0("Proportion of non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv %>% sum)/(non_biv %in% commonGenes %>% sum)))
+print(paste0("Number of non-bivalent genes that are DE: ", (non_biv %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% non_biv %>% sum)))
+
+non_biv_k27 = (hmds$naive %>% filter(Gene %in% non_biv) %>% filter(logratio > 1))$Gene
+print(paste0("Proportion of K27 dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv_k27 %>% sum)/(non_biv_k27 %in% commonGenes %>% sum)))
+print(paste0("Number of K27 dom non-bivalent genes that are DE: ", (non_biv_k27 %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% non_biv_k27 %>% sum)))
+
+non_biv_k4 = (hmds$naive %>% filter(Gene %in% non_biv) %>% filter(logratio < -1))$Gene
+print(paste0("Proportion of K4 dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv_k4 %>% sum)/(non_biv_k4 %in% commonGenes %>% sum)))
+print(paste0("Number of K4 dom non-bivalent genes that are DE: ", (non_biv_k4 %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% non_biv_k4 %>% sum)))
+
+non_biv_mid = (hmds$naive %>% filter(Gene %in% non_biv) %>% filter(logratio < 1 & logratio > -1))$Gene
+print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv_mid %>% sum)/(non_biv_mid %in% commonGenes %>% sum)))
+print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", (non_biv_mid %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% non_biv_mid %>% sum)))
 
 ```
 
@@ -988,14 +1005,17 @@ library(wesanderson)
 
 pal = wes_palette("Zissou1", type = "continuous")
 
-simple_roc = function(labels, hmds, rev = F)
+simple_roc = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T, title_overlap = T)
 {
   df = data.frame(labs = labels, hmd = hmds)
   roc_df = df %>% mutate(hmd = ifelse(hmd<0, 0, hmd)) %>% mutate(hmd = ifelse(hmd>100, 100, hmd)) %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
   roc_df$tpr = roc_df$tps/sum(roc_df$tp)
   roc_df$fpr = roc_df$fps/sum(roc_df$fp)
   
-  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_line(size=1) + scale_color_gradientn(colors = pal, limits = c(0, 100)) + theme_classic()
+  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_segment(aes(x = 0, xend = 1, y = 0, yend = 1), size = 0.5, color = "black") + geom_line(size=1) + scale_color_gradientn(colors = pal, limits = c(0, 100)) + theme_classic() + scale_x_continuous(name = "False Positive Rate", breaks = seq(0, 1, 0.25)) + scale_y_continuous(name = "True Positive Rate", breaks = seq(0, 1, 0.25)) + theme(text = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), title = element_text(size = 10, color = "black"))
+  
+  if (!legend_overlap){ roc_plt = roc_plt + theme(legend.position = 'none') }
+  if (!is.na(title_text) & title_overlap){ roc_plt = roc_plt + ggtitle(title_text) }
   print(roc_plt)
   
   auc_df = roc_df %>% tail(-1)
@@ -1012,7 +1032,11 @@ simple_roc_notrim = function(labels, hmds, rev = F)
   roc_df$tpr = roc_df$tps/sum(roc_df$tp)
   roc_df$fpr = roc_df$fps/sum(roc_df$fp)
   
-  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_line(size=1) + scale_color_gradientn(colors = pal) + theme_classic()
+  roc_plt = ggplot(data = roc_df, aes(x = fpr, y = tpr, color = hmd)) + geom_segment(aes(x = 0, xend = 1, y = 0, yend = 1), size = 0.5, color = "black") + geom_line(size=1) + scale_color_gradientn(colors = pal) + theme_classic() + scale_x_continuous(name = "False Positive Rate", breaks = seq(0, 1, 0.25)) + scale_y_continuous(name = "True Positive Rate", breaks = seq(0, 1, 0.25)) + theme(text = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), title = element_text(size = 10, color = "black"))
+  
+  if (!legend_overlap){ roc_plt = roc_plt + theme(legend.position = 'none') }
+  if (!is.na(title_text) & title_overlap){ roc_plt = roc_plt + ggtitle(title_text) }
+  print(roc_plt)
   print(roc_plt)
   
   auc_df = roc_df %>% tail(-1)
