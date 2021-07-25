@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This R Markdown file is meant to streamline the analysis of the bivalency data and keep it organized in one place. Different types of analyses will be in different sections with explanations as to why those are important. This section will contain only data loading and functions that are necessary for downstream analyses.
 
-## Data loading
+# Data loading
 
 This chunk loads in both the HMD data and the bulk RNA-seq data, as well as the tidyverse and sleuth libraries. NEW: It also conducts signal correction for H3K9me3 on the trans bivalency dataset.
 
@@ -112,7 +112,7 @@ metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap 
   if (length(ylims)>0){
     plot_summary = plot_summary + scale_y_continuous(limits = ylims, expand = c(0,0), name = "HMD (%)")
   } else {
-    plot_summary = plot_summary + scale_y_continuous(limits = ylims, expand = c(0,0), name = "HMD (%)")
+    plot_summary = plot_summary + scale_y_continuous(expand = c(0,0), name = "HMD (%)")
   }
   
   if (!is.na(title) & title_overlap){ plot_summary = plot_summary + ggtitle(title) }
@@ -233,7 +233,7 @@ Overwhelmingly, it again seems that across these bivalency dominance classes, bi
 
 # Gene Ontology Setup
 
-My next goal will be to conduct metagene analysis on differnet gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
+My next goal will be to conduct metagene analysis on different gene ontologies. The goal here will be to load up the gene ontology files and accessions so that I don't have to download it again in the future.
 
 ```{r gene_ontology_setup}
 
@@ -403,13 +403,18 @@ First thing to do is to get the gene expression of the genes overall. We'll be d
 
 ```{r violin_function}
 
-violin_plot = function(gene_expression_df, filter_set = consensusGenes, title_text)
+violin_plot = function(gene_expression_df, filter_set = consensusGenes, title_text, legend_overlap = T, title_overlap = T)
 {
-  violin_df = gene_expression_df %>% filter(refseq_id %in% filter_set) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = title_text)
-print(violin_plt)
+  violin_df = gene_expression_df %>% filter(refseq_id %in% filter_set) %>% select(refseq_id, Naive = naive, Primed = primed, NPC = npc) %>% mutate(across(.cols = Naive:NPC, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('Naive', 'Primed', 'NPC'), ordered = TRUE)
+  
+  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank()) + scale_y_continuous(name = "Log(TPM + 1e-4)", breaks = seq(-4, 6, 2))
+  
+  if (!legend_overlap){ violin_plt = violin_plt + theme(legend.position = 'none') }
+  
+  if (title_overlap){ violin_plt = violin_plt + labs(title = title_text) }
+  
+  print(violin_plt)
 }
 
 ```
@@ -459,15 +464,9 @@ for (i in 1:5)
   gene_list_set = (gene_expression_bivalent %>% arrange(desc(naive)) %>%  slice((countup*(i-1)):(countup*i - 1)))$refseq_id
   
   violin_plot(gene_expression_bivalent, gene_list_set, paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
-  
-  violin_df = gene_expression_bivalent %>% arrange(desc(naive)) %>%  slice((countup*(i-1)):(countup*i - 1)) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-  violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-  
-  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
-  print(violin_plt)
 }
 
-rm(gene_expression_bivalent, countup, violin_df, violin_plt, gene_list_set)
+rm(gene_expression_bivalent, countup, gene_list_set)
 
 ```
 
@@ -476,17 +475,16 @@ We will section more coarsely to cut off at above and below -3 for log10_tpm.
 ```{r section_gene_expression_coarse}
 
 gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
-violin_df = gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive>=-3) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-  
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
-print(violin_plt)
+gene_list_set_highexp = (gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive>=-3))$refseq_id
 
-violin_df = gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive< -3) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
-  
-violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
-print(violin_plt)
+violin_plot(gene_expression_bivalent, filter_set = gene_list_set_highexp, title_text = "Gene expression at bivalent genes in naive, log(TPM) > -3")
+
+gene_list_set_lowexp = (gene_expression_bivalent %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% filter(naive < -3))$refseq_id
+
+violin_plot(gene_expression_bivalent, filter_set = gene_list_set_lowexp, title_text = "Gene expression at bivalent genes in naive, log(TPM) < -3")
+
+
+rm(gene_expression_bivalent, gene_list_set_lowexp, gene_list_set_highexp)
 
 ```
 
@@ -500,14 +498,12 @@ for (i in 1:5)
 {
   gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
   countup = floor(length(gene_expression_bivalent$naive)/5)
-  violin_df = gene_expression_bivalent %>% arrange(desc(npc)) %>%  slice((countup*(i-1)):(countup*i - 1)) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
-  violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
+  gene_list_set = (gene_expression_bivalent %>% arrange(desc(npc)) %>%  slice((countup*(i-1)):(countup*i - 1)))$refseq_id
   
-  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = log10_tpm, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + labs(title = paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
-  print(violin_plt)
+  violin_plot(gene_expression_bivalent, gene_list_set, paste0("Gene expression at bivalent genes in naive mESCs, NPC expression quintile ", i))
 }
 
-rm(gene_expression_bivalent, countup, violin_df, violin_plt)
+rm(gene_expression_bivalent, countup)
 
 ```
 
@@ -723,11 +719,8 @@ First we will look at naive to npc, then look at primed to npc.
 
 ```{r classifcation_setup}
 
-<<<<<<< Updated upstream
-hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(trans+1), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
-=======
+
 hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1)), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans)
->>>>>>> Stashed changes
 
 naive_npc_BICs = numeric()
 
