@@ -1025,7 +1025,7 @@ simple_roc = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T
   return(sum(auc_df$area_diff))
 }
 
-simple_roc_notrim = function(labels, hmds, rev = F)
+simple_roc_notrim = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T, title_overlap = T)
 {
   df = data.frame(labs = labels, hmd = hmds)
   roc_df = df %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
@@ -1049,3 +1049,37 @@ simple_roc_notrim = function(labels, hmds, rev = F)
 ```
 
 We now want to leave receiver operator characteristic curves for all these datasets.
+
+```{r roc_curves_basic}
+
+simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$k4, title_text = "ROC Curve of Differential Expression from Naive to NPC by H3K4me3 Threshold", legend_overlap = F, title_overlap = F)
+simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$k9, title_text = "ROC Curve of Differential Expression from Naive to NPC by H3K9me3 Threshold")
+simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$k27, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by H3K27me3 Threshold")
+simple_roc_notrim(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$logk27 - hmd_diffexp_naive_npc$logk4, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by Ln K27/K4 Threshold")
+simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$trans, title_text = "ROC Curve of Differential Expression from Naive to NPC by Bivalency Threshold")
+
+simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k4, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K4me3 Threshold")
+simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k9, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K9me3 Threshold")
+simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k27, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K27me3 Threshold")
+simple_roc_notrim(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$logk27 - hmd_diffexp_primed_npc$logk4, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by Ln K27/K4 Threshold")
+simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$trans, title_text = "ROC Curve of Differential Expression from Primed to NPC by Bivalency Threshold")
+
+```
+
+We can also compare our modeling datasets by ROC curves to see if addition of trans bivalency as a parameter increases the accuracy of the model significantly by this metric.
+
+```{r roc_curves_modeled}
+
+simple_roc_notrim(hmd_diffexp_naive_npc_test$diffexp, hmd_diffexp_naive_npc_test$predicted, title_text = "ROC Curve of Diff Expression form Naive to NPC by the K4, K27, and logs model")
+
+simple_roc_notrim(hmd_diffexp_naive_npc_test$diffexp, hmd_diffexp_naive_npc_test$predicted_trans, title_text = "ROC Curve of Diff Expression form Naive to NPC by the K4, K27, trans, and logs model")
+
+simple_roc_notrim(hmd_diffexp_naive_npc_test$diffexp, hmd_diffexp_naive_npc_test$predicted_k9, title_text = "ROC Curve of Diff Expression form Naive to NPC by the K4, K27, logs, and K9 model")
+
+simple_roc_notrim(hmd_diffexp_primed_npc_test$diffexp, hmd_diffexp_primed_npc_test$predicted, title_text = "ROC Curve of Diff Expression form Primed to NPC by the K4, K27, and logs model")
+
+simple_roc_notrim(hmd_diffexp_primed_npc_test$diffexp, hmd_diffexp_primed_npc_test$predicted_trans, title_text = "ROC Curve of Diff Expression form Primed to NPC by the K4, K27, trans, and logs model")
+
+simple_roc_notrim(hmd_diffexp_primed_npc_test$diffexp, hmd_diffexp_primed_npc_test$predicted_k9, title_text = "ROC Curve of Diff Expression form Primed to NPC by the K4, K27, logs, and K9 model")
+
+```
