@@ -105,13 +105,19 @@ metagene = function(dataset, range, genes){
   return(summ_df)
 }
 
-metagene_plot = function(summ_df, ylims = NA, title = NA){
+metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap = F, title_overlap = T){
   summ_plt = summ_df %>% gather("mod", "hmd", -dist)
-  plot_summary = ggplot(data = summ_plt, aes(x = dist, y = hmd, color = mod)) + geom_line() + theme_classic()
+  plot_summary = ggplot(data = summ_plt, aes(x = dist, y = hmd, color = mod)) + geom_line(size = 1) + theme_classic() + scale_x_continuous(expand = c(0,0), name = "Dist. from TSS (kb)") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"))
   
-  if (!is.na(ylims)){ plot_summary = plot_summary + scale_y_continuous(limits = ylims) }
+  if (length(ylims)>0){
+    plot_summary = plot_summary + scale_y_continuous(limits = ylims, expand = c(0,0), name = "HMD (%)")
+  } else {
+    plot_summary = plot_summary + scale_y_continuous(limits = ylims, expand = c(0,0), name = "HMD (%)")
+  }
   
-  if (!is.na(title)){ plot_summary = plot_summary + ggtitle(title) }
+  if (!is.na(title) & title_overlap){ plot_summary = plot_summary + ggtitle(title) }
+  
+  if(legend_overlap){ plot_summary = plot_summary + theme(legend.position = 'none')}
   
   print(plot_summary)
 }
@@ -450,6 +456,10 @@ for (i in 1:5)
 {
   gene_expression_bivalent = gene_expression %>% filter(refseq_id %in% bivalent_genes_25$naive)
   countup = floor(length(gene_expression_bivalent$naive)/5)
+  gene_list_set = (gene_expression_bivalent %>% arrange(desc(naive)) %>%  slice((countup*(i-1)):(countup*i - 1)))$refseq_id
+  
+  violin_plot(gene_expression_bivalent, gene_list_set, paste0("Gene expression at bivalent genes in naive mESCs, naive expression quintile ", i))
+  
   violin_df = gene_expression_bivalent %>% arrange(desc(naive)) %>%  slice((countup*(i-1)):(countup*i - 1)) %>% select(refseq_id:npc) %>% mutate(across(.cols = naive:npc, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
   violin_df$cell_type = factor(violin_df$cell_type, levels = c('naive', 'primed', 'npc'), ordered = TRUE)
   
@@ -457,7 +467,7 @@ for (i in 1:5)
   print(violin_plt)
 }
 
-rm(gene_expression_bivalent, countup, violin_df, violin_plt)
+rm(gene_expression_bivalent, countup, violin_df, violin_plt, gene_list_set)
 
 ```
 
@@ -1002,7 +1012,7 @@ simple_roc = function(labels, hmds, rev = F)
   return(sum(auc_df$area_diff))
 }
 
-simple_roc_logs = function(labels, hmds, rev = F)
+simple_roc_notrim = function(labels, hmds, rev = F)
 {
   df = data.frame(labs = labels, hmd = hmds)
   roc_df = df %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
@@ -1021,4 +1031,4 @@ simple_roc_logs = function(labels, hmds, rev = F)
 
 ```
 
-TODO: Add ROCs for all the mods and for the different linear models.
+We now want to leave receiver operator characteristic curves for all these datasets.
