@@ -122,6 +122,26 @@ metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap 
   print(plot_summary)
 }
 
+violin_plot_hmd = function(gene_expression_df, ylims = numeric(), filter_set = consensusGenes, title_text, legend_overlap = T, title_overlap = T)
+{
+  violin_df = gene_expression_df %>% filter(Gene %in% filter_set) %>% select(refseq_id = Gene, Naive = naive, Primed = primed, NPC = npc) %>% gather(key = "cell_type", value = "HMD", -refseq_id)
+violin_df$cell_type = factor(violin_df$cell_type, levels = c('Naive', 'Primed', 'NPC'), ordered = TRUE)
+  
+  violin_plt = ggplot(data = violin_df, aes(x = cell_type, y = HMD, fill = cell_type)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank())
+  
+  if (length(ylims)>0){
+    violin_plt = violin_plt + scale_y_continuous(name = "HMD (%)", limits = ylims)
+  } else {
+    violin_plt = violin_plt + scale_y_continuous(name = "HMD (%)")
+  }
+  
+  if (!legend_overlap){ violin_plt = violin_plt + theme(legend.position = 'none') }
+  
+  if (title_overlap){ violin_plt = violin_plt + labs(title = title_text) }
+  
+  print(violin_plt)
+}
+
 ```
 
 # First-Pass HMD Metagene Analysis
@@ -133,6 +153,11 @@ First, we have to have a sense of how bivalency exists at all genes. To do this,
 metagene_plot(metagene(naive, tss_range, consensusGenes), ylims = c(0,80), title = "Naive mESCs")
 metagene_plot(metagene(primed, tss_range, consensusGenes), ylims = c(0,80), title = "Primed mESCs")
 metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title = "NPCs")
+
+bivalency_hmds = data.frame(Gene = consensusGenes) %>% inner_join(hmds$naive, by = "Gene") %>% select(Gene, naive = trans) %>% inner_join(hmds$primed, by = "Gene") %>% select(Gene, naive, primed = trans) %>% inner_join(hmds$npc, by = "Gene") %>% select(Gene, naive, primed, npc = trans)
+
+violin_plot_hmd(bivalency_hmds, title_text = "Bivalency")
+violin_plot_hmd(bivalency_hmds, title_text = "Bivalency", ylims = c(-25, 125))
 
 ```
 
