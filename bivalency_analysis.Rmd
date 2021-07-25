@@ -105,7 +105,7 @@ metagene = function(dataset, range, genes){
   return(summ_df)
 }
 
-metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap = F, title_overlap = T){
+metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap = T, title_overlap = F){
   summ_plt = summ_df %>% gather("mod", "hmd", -dist)
   plot_summary = ggplot(data = summ_plt, aes(x = dist, y = hmd, color = mod)) + geom_line(size = 1) + theme_classic() + scale_x_continuous(expand = c(0,0), name = "Dist. from TSS (kb)") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"))
   
@@ -122,7 +122,7 @@ metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap 
   print(plot_summary)
 }
 
-violin_plot_hmd = function(gene_expression_df, ylims = numeric(), filter_set = consensusGenes, title_text, legend_overlap = T, title_overlap = T)
+violin_plot_hmd = function(gene_expression_df, ylims = numeric(), filter_set = consensusGenes, title_text, legend_overlap = F, title_overlap = F)
 {
   violin_df = gene_expression_df %>% filter(Gene %in% filter_set) %>% select(refseq_id = Gene, Naive = naive, Primed = primed, NPC = npc) %>% gather(key = "cell_type", value = "HMD", -refseq_id)
 violin_df$cell_type = factor(violin_df$cell_type, levels = c('Naive', 'Primed', 'NPC'), ordered = TRUE)
@@ -428,7 +428,7 @@ First thing to do is to get the gene expression of the genes overall. We'll be d
 
 ```{r violin_function}
 
-violin_plot = function(gene_expression_df, filter_set = consensusGenes, title_text, legend_overlap = T, title_overlap = T)
+violin_plot = function(gene_expression_df, filter_set = consensusGenes, title_text, legend_overlap = F, title_overlap = F)
 {
   violin_df = gene_expression_df %>% filter(refseq_id %in% filter_set) %>% select(refseq_id, Naive = naive, Primed = primed, NPC = npc) %>% mutate(across(.cols = Naive:NPC, .fns = ~log10(.+.0001))) %>% gather(key = "cell_type", value = "log10_tpm", -refseq_id)
 violin_df$cell_type = factor(violin_df$cell_type, levels = c('Naive', 'Primed', 'NPC'), ordered = TRUE)
