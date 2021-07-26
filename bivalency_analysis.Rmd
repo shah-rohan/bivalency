@@ -1030,7 +1030,7 @@ library(wesanderson)
 
 pal = wes_palette("Zissou1", type = "continuous")
 
-simple_roc = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T, title_overlap = T)
+simple_roc = function(labels, hmds, title_text = NA, rev = F, legend_overlap = F, title_overlap = F)
 {
   df = data.frame(labs = labels, hmd = hmds)
   roc_df = df %>% mutate(hmd = ifelse(hmd<0, 0, hmd)) %>% mutate(hmd = ifelse(hmd>100, 100, hmd)) %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
@@ -1047,10 +1047,10 @@ simple_roc = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T
   auc_df$fpr_diff = auc_df$fpr - head(roc_df, -1)$fpr
   auc_df$area_diff = auc_df$fpr_diff*auc_df$tpr
   
-  return(sum(auc_df$area_diff))
+  return(sum(auc_df$area_diff) + auc_df$tpr[1]*auc_df$fpr[1]/2)
 }
 
-simple_roc_notrim = function(labels, hmds, title_text = NA, rev = F, legend_overlap = T, title_overlap = T)
+simple_roc_notrim = function(labels, hmds, title_text = NA, rev = F, legend_overlap = F, title_overlap = F)
 {
   df = data.frame(labs = labels, hmd = hmds)
   roc_df = df %>% group_by(hmd) %>% summarize(tp = sum(labs == 1-rev), fp= sum(labs == 0+rev)) %>% ungroup %>% arrange(desc(hmd)) %>% mutate(tps = cumsum(tp), fps = cumsum(fp))
@@ -1064,11 +1064,11 @@ simple_roc_notrim = function(labels, hmds, title_text = NA, rev = F, legend_over
   print(roc_plt)
   print(roc_plt)
   
-  auc_df = roc_df %>% tail(-1)
+  auc_df = roc_df %>% tail(-1) %>% select(tpr, fpr)
   auc_df$fpr_diff = auc_df$fpr - head(roc_df, -1)$fpr
   auc_df$area_diff = auc_df$fpr_diff*auc_df$tpr
   
-  return(sum(auc_df$area_diff))
+  return(sum(auc_df$area_diff) + auc_df$tpr[1]*auc_df$fpr[1]/2)
 }
 
 ```
