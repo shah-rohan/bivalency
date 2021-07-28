@@ -1191,6 +1191,31 @@ write.table(heatmap_all_k4, "heatmap_all_k4.tab", row.names = F, col.names = F)
 write.table(heatmap_all_k27, "heatmap_all_k27.tab", row.names = F, col.names = F)
 write.table(heatmap_all_biv, "heatmap_all_biv.tab", row.names = F, col.names = F)
 
+primed_summaries = hmds$primed %>% select(Gene, k4, k27, trans) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(-target_id, -naive, -npc) %>% arrange(desc(trans))
+
+heatmap_all_k4 = primed_summaries %>% inner_join(primed$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_k27 = primed_summaries %>% inner_join(primed$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_biv = primed_summaries %>% inner_join(primed$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_all_k4, "heatmaps/primed_heatmap_all_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_all_k27, "heatmaps/primed_heatmap_all_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_all_biv, "heatmaps/primed_heatmap_all_biv.tab", row.names = F, col.names = F)
+
+npc_summaries = hmds$npc %>% select(Gene, k4, k27, trans) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(-target_id, -naive, -primed) %>% arrange(desc(trans))
+
+heatmap_all_k4 = npc_summaries %>% inner_join(npc$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_k27 = npc_summaries %>% inner_join(npc$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_biv = npc_summaries %>% inner_join(npc$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_all_k4, "heatmaps/npc_heatmap_all_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_all_k27, "heatmaps/npc_heatmap_all_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_all_biv, "heatmaps/npc_heatmap_all_biv.tab", row.names = F, col.names = F)
+
+
 ```
 
 Now we look at bivalent genes.
@@ -1235,5 +1260,41 @@ heatmap_nondiffexp_biv = naive_summaries %>% filter(Gene %in% nondiffexpressed) 
 write.table(heatmap_nondiffexp_k4, "heatmap_nondiffexp_k4.tab", row.names = F, col.names = F)
 write.table(heatmap_nondiffexp_k27, "heatmap_nondiffexp_k27.tab", row.names = F, col.names = F)
 write.table(heatmap_nondiffexp_biv, "heatmap_nondiffexp_biv.tab", row.names = F, col.names = F)
+
+```
+
+And now reverse feature search.
+
+```{r heatmap_bivalent}
+
+heatmap_bivalent_k4 = naive_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(naive$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_k27 = naive_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(naive$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_biv = naive_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_k4, "heatmaps/naive_heatmap_reverse_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_k27, "heatmaps/naive_heatmap_reverse_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_biv, "heatmaps/naive_heatmap_reverse_biv.tab", row.names = F, col.names = F)
+
+heatmap_bivalent_k4 = primed_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(primed$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_k27 = primed_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(primed$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_biv = primed_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(primed$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_k4, "heatmaps/primed_heatmap_reverse_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_k27, "heatmaps/primed_heatmap_reverse_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_biv, "heatmaps/primed_heatmap_reverse_biv.tab", row.names = F, col.names = F)
+
+heatmap_bivalent_k4 = npc_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(npc$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_k27 = npc_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(npc$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_biv = npc_summaries %>% filter(Gene %in% bivalent_loss_de) %>% inner_join(npc$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_k4, "heatmaps/npc_heatmap_reverse_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_k27, "heatmaps/npc_heatmap_reverse_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_biv, "heatmaps/npc_heatmap_reverse_biv.tab", row.names = F, col.names = F)
 
 ```
