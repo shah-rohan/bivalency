@@ -1108,3 +1108,72 @@ simple_roc_notrim(hmd_diffexp_primed_npc_test$diffexp, hmd_diffexp_primed_npc_te
 simple_roc_notrim(hmd_diffexp_primed_npc_test$diffexp, hmd_diffexp_primed_npc_test$predicted_k9, title_text = "ROC Curve of Diff Expression form Primed to NPC by the K4, K27, logs, and K9 model")
 
 ```
+
+# Heatmap Generation
+
+The last thing we really have to do is to generate heatmaps. I'll write out the heatmaps that we need below, then just output files that will be put into ImageJ for analysis.
+
+```{r heatmap_summary}
+
+naive_summaries = hmds$naive %>% select(Gene, k4, k27, trans) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(-target_id, -primed, -npc) %>% arrange(desc(trans))
+
+side_naive_summaries = sapply(naive_summaries[1:42000, 2:5], function(x) colMeans(matrix(x, nrow = 210))) %>% data.frame %>% mutate(logtpm = log10(naive + 1e-4))
+
+write.table(side_naive_summaries, "side_graph_summaries.tab", row.names = F)
+
+heatmap_all_k4 = naive_summaries %>% inner_join(naive$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_k27 = naive_summaries %>% inner_join(naive$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_all_biv = naive_summaries %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_all_k4, "heatmap_all_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_all_k27, "heatmap_all_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_all_biv, "heatmap_all_biv.tab", row.names = F, col.names = F)
+
+```
+
+Now we look at bivalent genes.
+
+```{r heatmap_bivalent}
+
+heatmap_bivalent_k4 = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(naive$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_k27 = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(naive$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_bivalent_biv = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_k4, "heatmap_bivalent_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_k27, "heatmap_bivalent_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_biv, "heatmap_bivalent_biv.tab", row.names = F, col.names = F)
+
+```
+
+And now differentially expressed and not differentially expressed genes.
+
+```{r heatmap_diff_expr}
+
+diffexpressed = (sleuth_table_gene$naive_npc %>% filter(qval <= 0.05))$refseq_id
+nondiffexpressed = (sleuth_table_gene$naive_npc %>% filter(qval > 0.05))$refseq_id
+
+heatmap_diffexp_k4 = naive_summaries %>% filter(Gene %in% diffexpressed) %>% inner_join(naive$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_diffexp_k27 = naive_summaries %>% filter(Gene %in% diffexpressed) %>% inner_join(naive$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_diffexp_biv = naive_summaries %>% filter(Gene %in% diffexpressed) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_diffexp_k4, "heatmap_diffexp_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_diffexp_k27, "heatmap_diffexp_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_diffexp_biv, "heatmap_diffexp_biv.tab", row.names = F, col.names = F)
+
+heatmap_nondiffexp_k4 = naive_summaries %>% filter(Gene %in% nondiffexpressed) %>% inner_join(naive$k4, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_nondiffexp_k27 = naive_summaries %>% filter(Gene %in% nondiffexpressed) %>% inner_join(naive$k27, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+heatmap_nondiffexp_biv = naive_summaries %>% filter(Gene %in% nondiffexpressed) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_nondiffexp_k4, "heatmap_nondiffexp_k4.tab", row.names = F, col.names = F)
+write.table(heatmap_nondiffexp_k27, "heatmap_nondiffexp_k27.tab", row.names = F, col.names = F)
+write.table(heatmap_nondiffexp_biv, "heatmap_nondiffexp_biv.tab", row.names = F, col.names = F)
+
+```
