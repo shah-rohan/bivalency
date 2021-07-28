@@ -83,6 +83,19 @@ hmds$npc = hmds$npc %>% mutate(trans = (trans - specificities["npc",]$trans_ip_k
 
 rm(specificities)
 
+naive_input = read.table("inputs/AR14_mESC_with2i_input_promoters.tab", stringsAsFactors = F, header = F)
+colnames(naive_input) = c("Gene", "naive")
+
+primed_input = read.table("inputs/AR18_primed_input.tab", stringsAsFactors = F, header = F)
+colnames(primed_input) = c("Gene", "primed")
+
+npc_input = read.table("inputs/AR18_npc_input.tab", stringsAsFactors = F, header = F)
+colnames(npc_input) = c("Gene", "npc")
+
+inputs = naive_input %>% inner_join(primed_input, by = "Gene") %>% inner_join(npc_input, by = "Gene")
+
+rm(naive_input, primed_input, npc_input)
+
 ```
 
 The next chunk loads in functions to make metagenes.
@@ -156,7 +169,9 @@ metagene_plot(metagene(npc, tss_range, consensusGenes), ylims = c(0,80), title =
 
 bivalency_hmds = data.frame(Gene = consensusGenes) %>% inner_join(hmds$naive, by = "Gene") %>% select(Gene, naive = trans) %>% inner_join(hmds$primed, by = "Gene") %>% select(Gene, naive, primed = trans) %>% inner_join(hmds$npc, by = "Gene") %>% select(Gene, naive, primed, npc = trans)
 
-violin_plot_hmd(bivalency_hmds, title_text = "Bivalency")
+input_gt_5_all = (inputs %>% filter(naive > 5 & primed > 5 & npc > 5))$Gene
+
+violin_plot_hmd(bivalency_hmds, title_text = "Bivalency", filter_set = input_gt_5_all)
 violin_plot_hmd(bivalency_hmds, title_text = "Bivalency", ylims = c(-25, 125))
 
 ```
@@ -218,6 +233,9 @@ metagene_plot(metagene(naive, tss_range, bivalent_genes_50[["naive"]]), title = 
 metagene_plot(metagene(primed, tss_range, bivalent_genes_50[["naive"]]), title = "Primed cells at genes with trans bivalent >50% in naive")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "NPC cells at genes with trans bivalent >50% in naive")
 
+metagene_plot(metagene(primed, tss_range, bivalent_genes_25[["primed"]]), title = "Primed cells at genes with trans bivalent >25% in primed")
+metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["primed"]]), title = "NPC cells at genes with trans bivalent >25% in primed")
+
 ```
 
 Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent.
@@ -233,6 +251,12 @@ hmds[["naive"]] = hmds[["naive"]] %>% mutate(logratio = log(k27+1) - log(k4+1))
 naive_dominance[["k27"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
 naive_dominance[["k4"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
 naive_dominance[["mid"]] = (hmds[["naive"]] %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
+
+primed_dominance = list()
+hmds[["primed"]] = hmds[["primed"]] %>% mutate(logratio = log(k27+1) - log(k4+1))
+primed_dominance[["k27"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
+primed_dominance[["k4"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
+primed_dominance[["mid"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
 
 ```
 
@@ -589,6 +613,42 @@ print(paste0("Number of K4 dom non-bivalent genes that are DE: ", (non_biv_k4 %i
 non_biv_mid = (hmds$naive %>% filter(Gene %in% non_biv) %>% filter(logratio < 1 & logratio > -1))$Gene
 print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$naive_npc %in% non_biv_mid %>% sum)/(non_biv_mid %in% commonGenes %>% sum)))
 print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", (non_biv_mid %in% commonGenes %>% sum) - (nonregulated_genes$naive_npc %in% non_biv_mid %>% sum)))
+
+```
+
+Doing the same for Primed to NPC:
+
+```{r dominance_diffexp_primed}
+
+commonGenes = sleuth_table_gene$primed_npc$refseq_id[sleuth_table_gene$primed_npc$refseq_id %in% consensusGenes]
+
+print(paste0("Proportion of bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% bivalent_genes_25$primed %>% sum)/(bivalent_genes_25$primed %in% commonGenes %>% sum)))
+print(paste0("Number of bivalent genes that are DE: ", (bivalent_genes_25$primed %in% commonGenes %>% sum)- (nonregulated_genes$primed_npc %in% bivalent_genes_25$primed %>% sum)))
+
+print(paste0("Proportion of K27 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% primed_dominance$k27 %>% sum)/(primed_dominance$k27 %in% commonGenes %>% sum)))
+print(paste0("Number of K27 dom bivalent genes that are DE: ", (primed_dominance$k27 %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% primed_dominance$k27 %>% sum)))
+
+print(paste0("Proportion of K4 dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% primed_dominance$k4 %>% sum)/(primed_dominance$k4 %in% commonGenes %>% sum)))
+print(paste0("Number of K4 dom bivalent genes that are DE: ", (primed_dominance$k4 %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% primed_dominance$k4 %>% sum)))
+
+print(paste0("Proportion of mid dom bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% primed_dominance$mid %>% sum)/(primed_dominance$mid %in% commonGenes %>% sum)))
+print(paste0("Number of mid dom bivalent genes that are DE: ", (primed_dominance$mid %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% primed_dominance$mid %>% sum)))
+
+non_biv = setdiff(commonGenes, bivalent_genes_25$primed)
+print(paste0("Proportion of non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% non_biv %>% sum)/(non_biv %in% commonGenes %>% sum)))
+print(paste0("Number of non-bivalent genes that are DE: ", (non_biv %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% non_biv %>% sum)))
+
+non_biv_k27 = (hmds$primed %>% filter(Gene %in% non_biv) %>% filter(logratio > 1))$Gene
+print(paste0("Proportion of K27 dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% non_biv_k27 %>% sum)/(non_biv_k27 %in% commonGenes %>% sum)))
+print(paste0("Number of K27 dom non-bivalent genes that are DE: ", (non_biv_k27 %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% non_biv_k27 %>% sum)))
+
+non_biv_k4 = (hmds$primed %>% filter(Gene %in% non_biv) %>% filter(logratio < -1))$Gene
+print(paste0("Proportion of K4 dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% non_biv_k4 %>% sum)/(non_biv_k4 %in% commonGenes %>% sum)))
+print(paste0("Number of K4 dom non-bivalent genes that are DE: ", (non_biv_k4 %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% non_biv_k4 %>% sum)))
+
+non_biv_mid = (hmds$primed %>% filter(Gene %in% non_biv) %>% filter(logratio < 1 & logratio > -1))$Gene
+print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", 100-100*(nonregulated_genes$primed_npc %in% non_biv_mid %>% sum)/(non_biv_mid %in% commonGenes %>% sum)))
+print(paste0("Proportion of mid dom non-bivalent genes that are DE: ", (non_biv_mid %in% commonGenes %>% sum) - (nonregulated_genes$primed_npc %in% non_biv_mid %>% sum)))
 
 ```
 
