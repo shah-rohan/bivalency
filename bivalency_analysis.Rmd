@@ -96,6 +96,10 @@ inputs = naive_input %>% inner_join(primed_input, by = "Gene") %>% inner_join(np
 
 rm(naive_input, primed_input, npc_input)
 
+methyldata = read.table("mm10_rna_0-400_cpg_naive-rep_primed-rep.bedgraph", header = F, stringsAsFactors = F)
+
+methyldata = methyldata %>% transmute(Gene = V4, naive = (V5+V6)/2, primed = (V7+V8)/2)
+
 ```
 
 The next chunk loads in functions to make metagenes.
@@ -821,8 +825,7 @@ First we will look at naive to npc, then look at primed to npc.
 
 ```{r classifcation_setup}
 
-
-hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1)), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans)
+hmd_diffexp_naive_npc = hmds$naive %>% inner_join(sleuth_table_gene$naive_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% inner_join(methyldata, by = "Gene") %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1)), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans, methyl = naive)
 
 naive_npc_BICs = numeric()
 
@@ -853,13 +856,20 @@ naive_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, dat
 # K4 + K27 + log of each + bivalency
 naive_npc_BICs["k4_k27_trans_logs"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans, data = hmd_diffexp_naive_npc, family = binomial))
 
+# methyl
+naive_npc_BICs["methyl"] = BIC(glm(diffexp ~ methyl, data = hmd_diffexp_naive_npc, family = binomial))
+
+# K4 + K27 + log of each + methyl
+naive_npc_BICs["k4_k27_logs_methyl"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + methyl, data = hmd_diffexp_naive_npc, family = binomial))
+
+# K4 + K27 + log of each + bivalency + methyl
+naive_npc_BICs["k4_k27_trans_logs_methyl"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans + methyl, data = hmd_diffexp_naive_npc, family = binomial))
+
 print(naive_npc_BICs[order(naive_npc_BICs)])
 
 ```
 
 On the whole, we find that the model with K4 and K27 with logs of both minimizes BIC by approximately 14.
-
-Full summary of top two models:
 
 ```{r logistic_regressions_summaries}
 
@@ -889,21 +899,20 @@ hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc[-sample,]
 glm_k4_k27_logs_naive_npc_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_naive_npc_train, family = binomial)
 glm_k4_k27_logs_naive_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_naive_npc_train, family = binomial)
 glm_k4_k27_logs_naive_npc_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_naive_npc_train, family = binomial)
+glm_k4_k27_logs_naive_npc_methyl_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + methyl, data = hmd_diffexp_naive_npc_train, family = binomial)
 
 hmd_diffexp_naive_npc_test$predicted = predict(glm_k4_k27_logs_naive_npc_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
 hmd_diffexp_naive_npc_test$predicted_trans = predict(glm_k4_k27_logs_naive_npc_trans_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
 hmd_diffexp_naive_npc_test$predicted_k9 = predict(glm_k4_k27_logs_naive_npc_k9_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
+hmd_diffexp_naive_npc_test$predicted_methyl = predict(glm_k4_k27_logs_naive_npc_methyl_train, newdata = hmd_diffexp_naive_npc_test, type = "response")
 
-plot(x = hmd_diffexp_naive_npc_test$predicted, y = hmd_diffexp_naive_npc_test$diffexp)
-plot(x = hmd_diffexp_naive_npc_test$predicted_trans, y = hmd_diffexp_naive_npc_test$diffexp)
-plot(x = hmd_diffexp_naive_npc_test$predicted_k9, y = hmd_diffexp_naive_npc_test$diffexp)
-
-hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
+hmd_diffexp_naive_npc_test = hmd_diffexp_naive_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0), predicted_dir_methyl = ifelse(predicted_methyl>0.5, 1, 0))
 
 mean(1==hmd_diffexp_naive_npc_test$diffexp)
 mean(hmd_diffexp_naive_npc_test$predicted_dir==hmd_diffexp_naive_npc_test$diffexp)
 mean(hmd_diffexp_naive_npc_test$predicted_dir_trans==hmd_diffexp_naive_npc_test$diffexp)
 mean(hmd_diffexp_naive_npc_test$predicted_dir_k9==hmd_diffexp_naive_npc_test$diffexp)
+mean(hmd_diffexp_naive_npc_test$predicted_dir_methyl==hmd_diffexp_naive_npc_test$diffexp)
 
 ```
 
@@ -913,7 +922,7 @@ By the trivial model where we assume everything is differentially expressed, we 
 
 ```{r classifcation_setup_primed}
 
-hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1))) %>% select(diffexp, k4, logk4, k27, logk27, k9, trans, logtrans)
+hmd_diffexp_primed_npc = hmds$primed %>% inner_join(sleuth_table_gene$primed_npc, by = c("Gene" = "refseq_id")) %>% select(Gene:k27, trans, qval) %>% mutate(diffexp = ifelse(qval <= 0.05, 1, 0)) %>% mutate(diffexp = as.factor(diffexp)) %>% inner_join(methyldata, by = "Gene") %>% mutate(logk4 = log(k4+1), logk27 = log(k27+1), logtrans = log(ifelse(trans+1>1, trans+1, 1)), logk9 = log(k9+1)) %>% select(diffexp, k4, logk4, k27, logk27, k9, logk9, trans, logtrans, methyl = primed)
 
 primed_npc_BICs = numeric()
 
@@ -943,6 +952,15 @@ primed_npc_BICs["k4_k27_logs"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27, da
 
 # K4 + K27 + log of each + bivalency
 primed_npc_BICs["k4_k27_trans_logs"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans, data = hmd_diffexp_primed_npc, family = binomial))
+
+# methyl
+primed_npc_BICs["methyl"] = BIC(glm(diffexp ~ methyl, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27 + log of each + methyl
+primed_npc_BICs["k4_k27_logs_methyl"] = BIC(glm(diffexp ~ k4 + k27 + logk4 + logk27 + methyl, data = hmd_diffexp_primed_npc, family = binomial))
+
+# K4 + K27 + log of each + bivalency + methyl
+primed_npc_BICs["k4_k27_trans_logs_methyl"] = BIC(glm(diffexp ~ k4 + k27 + trans + logk4 + logk27 + logtrans + methyl, data = hmd_diffexp_primed_npc, family = binomial))
 
 print(primed_npc_BICs[order(primed_npc_BICs)])
 
@@ -980,21 +998,20 @@ hmd_diffexp_primed_npc_test = hmd_diffexp_primed_npc[-sample,]
 glm_k4_k27_logs_primed_npc_train = glm(diffexp ~ k4 + k27 + logk4 + logk27, data = hmd_diffexp_primed_npc_train, family = binomial)
 glm_k4_k27_logs_primed_npc_trans_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + trans + logtrans, data = hmd_diffexp_primed_npc_train, family = binomial)
 glm_k4_k27_logs_primed_npc_k9_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + k9, data = hmd_diffexp_primed_npc_train, family = binomial)
+glm_k4_k27_logs_primed_npc_methyl_train = glm(diffexp ~ k4 + k27 + logk4 + logk27 + methyl, data = hmd_diffexp_primed_npc_train, family = binomial)
 
 hmd_diffexp_primed_npc_test$predicted = predict(glm_k4_k27_logs_primed_npc_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
 hmd_diffexp_primed_npc_test$predicted_trans = predict(glm_k4_k27_logs_primed_npc_trans_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
 hmd_diffexp_primed_npc_test$predicted_k9 = predict(glm_k4_k27_logs_primed_npc_k9_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
+hmd_diffexp_primed_npc_test$predicted_methyl = predict(glm_k4_k27_logs_primed_npc_methyl_train, newdata = hmd_diffexp_primed_npc_test, type = "response")
 
-plot(x = hmd_diffexp_primed_npc_test$predicted, y = hmd_diffexp_primed_npc_test$diffexp)
-plot(x = hmd_diffexp_primed_npc_test$predicted_trans, y = hmd_diffexp_primed_npc_test$diffexp)
-plot(x = hmd_diffexp_primed_npc_test$predicted_k9, y = hmd_diffexp_primed_npc_test$diffexp)
-
-hmd_diffexp_primed_npc_test = hmd_diffexp_primed_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0))
+hmd_diffexp_primed_npc_test = hmd_diffexp_primed_npc_test %>% mutate(predicted_dir = ifelse(predicted>0.5, 1, 0), predicted_dir_trans = ifelse(predicted_trans>0.5, 1, 0), predicted_dir_k9 = ifelse(predicted_k9>0.5, 1, 0), predicted_dir_methyl = ifelse(predicted_methyl>0.5, 1, 0))
 
 mean(0==hmd_diffexp_primed_npc_test$diffexp)
 mean(hmd_diffexp_primed_npc_test$predicted_dir==hmd_diffexp_primed_npc_test$diffexp)
 mean(hmd_diffexp_primed_npc_test$predicted_dir_trans==hmd_diffexp_primed_npc_test$diffexp)
 mean(hmd_diffexp_primed_npc_test$predicted_dir_k9==hmd_diffexp_primed_npc_test$diffexp)
+mean(hmd_diffexp_primed_npc_test$predicted_dir_methyl==hmd_diffexp_primed_npc_test$diffexp)
 
 ```
 
