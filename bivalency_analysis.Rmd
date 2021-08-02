@@ -1159,14 +1159,14 @@ simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$k9, title_text =
 simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$k27, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by H3K27me3 Threshold")
 simple_roc_notrim(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$logk27 - hmd_diffexp_naive_npc$logk4, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by Ln K27/K4 Threshold")
 simple_roc(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$trans, title_text = "ROC Curve of Differential Expression from Naive to NPC by Bivalency Threshold")
-simple_roc_notrim(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$methyl, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by Methylation")
+simple_roc_notrim(hmd_diffexp_naive_npc$diffexp, hmd_diffexp_naive_npc$methyl, rev = T, title_text = "ROC Curve of Differential Expression from Naive to NPC by Methylation", legend_overlap = T)
 
 simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k4, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K4me3 Threshold")
 simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k9, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K9me3 Threshold")
 simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$k27, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by H3K27me3 Threshold")
 simple_roc_notrim(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$logk27 - hmd_diffexp_primed_npc$logk4, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by Ln K27/K4 Threshold")
 simple_roc(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$trans, title_text = "ROC Curve of Differential Expression from Primed to NPC by Bivalency Threshold")
-simple_roc_notrim(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$methyl, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by Methylation")
+simple_roc_notrim(hmd_diffexp_primed_npc$diffexp, hmd_diffexp_primed_npc$methyl, rev = T, title_text = "ROC Curve of Differential Expression from Primed to NPC by Methylation", legend_overlap = T)
 
 ```
 
