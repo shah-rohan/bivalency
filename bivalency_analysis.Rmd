@@ -100,6 +100,12 @@ methyldata = read.table("mm10_rna_0-400_cpg_naive-rep_primed-rep.bedgraph", head
 
 methyldata = methyldata %>% transmute(Gene = V4, naive = (V5+V6)/2, primed = (V7+V8)/2)
 
+enzymes = list()
+enzymes$set1a = (read.table("hmts/Set1A_consensusPeak_genes_slop.bed", header = F, stringsAsFactors = F))$V4
+enzymes$ezh1 = (read.table("hmts/Ezh1_genes_slop.bed", header = F, stringsAsFactors = F))$V4
+enzymes$ezh2 = (read.table("hmts/Ezh2_genes_slop.bed", header = F, stringsAsFactors = F))$V4
+enzymes$mll2 = (read.table("hmts/MLL2_genes_slop.bed", header = F, stringsAsFactors = F))$V4
+
 ```
 
 The next chunk loads in functions to make metagenes.
@@ -122,7 +128,7 @@ metagene = function(dataset, range, genes){
   return(summ_df)
 }
 
-metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap = T, title_overlap = F){
+metagene_plot = function(summ_df, ylims = numeric(), title = NA, legend_overlap = F, title_overlap = T){
   summ_plt = summ_df %>% gather("mod", "hmd", -dist)
   plot_summary = ggplot(data = summ_plt, aes(x = dist, y = hmd, color = mod)) + geom_line(size = 1) + theme_classic() + scale_x_continuous(expand = c(0,0), name = "Dist. from TSS (kb)") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"))
   
@@ -229,22 +235,27 @@ metagene_plot(metagene(naive, tss_range, bivalent_genes_10[["naive"]]), title = 
 metagene_plot(metagene(primed, tss_range, bivalent_genes_10[["naive"]]), title = "Primed cells at genes with trans bivalent >10% in naive")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_10[["naive"]]), title = "NPC cells at genes with trans bivalent >10% in naive")
 
-metagene_plot(metagene(naive, tss_range, bivalent_genes_25[["naive"]]), title = "Naive cells at genes with trans bivalent >25% in naive")
-metagene_plot(metagene(primed, tss_range, bivalent_genes_25[["naive"]]), title = "Primed cells at genes with trans bivalent >25% in naive")
-metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["naive"]]), title = "NPC cells at genes with trans bivalent >25% in naive")
+metagene_plot(metagene(naive, tss_range, bivalent_genes_25[["naive"]]), title = "Naive cells at genes with trans bivalent >25% in naive", title_overlap = F, legend_overlap = T, ylims = c(0, 100))
+metagene_plot(metagene(primed, tss_range, bivalent_genes_25[["naive"]]), title = "Primed cells at genes with trans bivalent >25% in naive", title_overlap = F, legend_overlap = T, ylims = c(0, 100))
+metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["naive"]]), title = "NPC cells at genes with trans bivalent >25% in naive", title_overlap = F, legend_overlap = T, ylims = c(0, 100))
 
 metagene_plot(metagene(naive, tss_range, bivalent_genes_50[["naive"]]), title = "Naive cells at genes with trans bivalent >50% in naive")
 metagene_plot(metagene(primed, tss_range, bivalent_genes_50[["naive"]]), title = "Primed cells at genes with trans bivalent >50% in naive")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_50[["naive"]]), title = "NPC cells at genes with trans bivalent >50% in naive")
 
+metagene_plot(metagene(naive, tss_range, bivalent_genes_25[["primed"]]), title = "Naive cells at genes with trans bivalent >25% in primed", title_overlap = F, legend_overlap = T)
 metagene_plot(metagene(primed, tss_range, bivalent_genes_25[["primed"]]), title = "Primed cells at genes with trans bivalent >25% in primed")
 metagene_plot(metagene(npc, tss_range, bivalent_genes_25[["primed"]]), title = "NPC cells at genes with trans bivalent >25% in primed")
+
+metagene_plot(metagene(naive, tss_range, setdiff(bivalent_genes_25[["primed"]], bivalent_genes_25[["naive"]])), title = "Naive cells at genes with trans bivalent >25% in primed", title_overlap = F, legend_overlap = T, ylims = c(0, 60))
+metagene_plot(metagene(primed, tss_range, setdiff(bivalent_genes_25[["primed"]], bivalent_genes_25[["naive"]])), title = "Primed cells at genes with trans bivalent >25% in primed", title_overlap = F, legend_overlap = T, ylims = c(0, 60))
+metagene_plot(metagene(npc, tss_range, setdiff(bivalent_genes_25[["primed"]], bivalent_genes_25[["naive"]])), title = "NPC cells at genes with trans bivalent >25% in primed", title_overlap = F, legend_overlap = T, ylims = c(0, 60))
 
 ```
 
 Basically, no matter how we call it, bivalent genes seem to broadly stay bivalent.
 
-## Dominance sectioning
+# Dominance sectioning
 
 Let's see if sectioning this by K27 dominant bivalency or K4 dominant bivalency in the naive dataset helps at all.
 
@@ -261,6 +272,12 @@ hmds[["primed"]] = hmds[["primed"]] %>% mutate(logratio = log(k27+1) - log(k4+1)
 primed_dominance[["k27"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
 primed_dominance[["k4"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
 primed_dominance[["mid"]] = (hmds[["primed"]] %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
+
+npc_dominance = list()
+hmds[["npc"]] = hmds[["npc"]] %>% mutate(logratio = log(k27+1) - log(k4+1))
+npc_dominance[["k27"]] = (hmds[["npc"]] %>% filter(trans > 25) %>% filter(logratio > 1))$Gene
+npc_dominance[["k4"]] = (hmds[["npc"]] %>% filter(trans > 25) %>% filter(logratio < -1))$Gene
+npc_dominance[["mid"]] = (hmds[["npc"]] %>% filter(trans > 25) %>% filter(logratio <= 1 & logratio >= -1))$Gene
 
 ```
 
@@ -580,9 +597,35 @@ metagene_plot(metagene(naive, tss_range, nonregulated_genes$naive_npc), title = 
 metagene_plot(metagene(primed, tss_range, nonregulated_genes$naive_npc), title = paste0("Primed cells at genes nonregulated from naive to NPC (", length(nonregulated_genes$naive_npc), " genes)"))
 metagene_plot(metagene(npc, tss_range, nonregulated_genes$naive_npc), title = paste0("NPC cells at genes nonregulated from naive to NPC (", length(nonregulated_genes$naive_npc), " genes)"))
 
+metagene_plot(metagene(primed, tss_range, nonregulated_genes$primed_npc), title = "Primed cells at genes nonregualted from primed to NPC")
+metagene_plot(metagene(primed, tss_range, c(upregulated_genes$primed_npc, downregulated_genes$primed_npc)), title = "Primed cells at genes nonregualted from primed to NPC")
+
 ```
 
 Minor differences in magnitude aside, there is basically no difference between the bivalency profiles of upregulated and downregulated genes.
+
+Looking at metagenes based on sectioning of gene expression:
+```{r metagenes_expression_deciles}
+
+expressed_genes = gene_expression %>% filter(refseq_id %in% consensusGenes) %>% arrange(desc(naive))
+countup = floor(length(expressed_genes$naive)/10)
+expression_section_meta = data.frame(dist = tss_range)
+
+for (i in 1:10)
+{
+  gene_list_set = (expressed_genes %>%  slice((countup*(i-1)+1):(countup*i)))$refseq_id
+  expression_section_meta[paste0("decile_0",i)] = naive$trans %>% filter(Gene %in% gene_list_set) %>% select(X.3000:X3000) %>% summarize(across(.fns = mean)) %>% as.numeric()
+}
+
+expression_section_meta = expression_section_meta %>% rename(decile_10 = decile_010)
+
+summ_plt = expression_section_meta %>% gather("mod", "hmd", -dist)
+plot_summary = ggplot(data = summ_plt, aes(x = dist, y = hmd, color = mod)) + geom_line(size = 1) + theme_classic() + scale_x_continuous(expand = c(0,0), name = "Dist. from TSS (kb)") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black")) + scale_color_manual(values = rainbow(12)) + theme(legend.position = 'none') 
+print(plot_summary)
+
+rm(expressed_genes, countup, gene_list_set, plot_summary, summ_plt, expression_section_meta)
+
+```
 
 Given the above results, however, we have to do some overlap analysis between dominance classes and the differential expression classes.
 
@@ -1097,6 +1140,42 @@ for (i in names(ouranalysis))
 
 Again, they're just looking at the H3K27me3-dominated class of genes.
 
+We'll also look at enzyme classes to see that helps us define bivalency. We'll look at genes with peaks for the enzymes of interest within -2.5kb upstream to the end of the gene.
+
+```{r enzyme_metagenes}
+
+enzymes_fisher = list()
+
+for (i in names(enzymes))
+{
+  in_both = bivalent_genes_25$naive %in% enzymes[[i]] %>% sum
+  only_naive = setdiff(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes], enzymes[[i]]) %>% length
+  only_enzymes = setdiff(enzymes[[i]], bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]) %>% length
+  in_neither = length(consensusGenes) - only_naive - only_enzymes + in_both
+  print(i)
+  print(matrix(c(in_both, only_naive, only_enzymes, in_neither), nr = 2))
+  enzymes_fisher[[i]] = fisher.test(matrix(c(in_both, only_naive, only_enzymes, in_neither), nr = 2), alternative = "greater")
+  print(phyper(in_both, length(bivalent_genes_25$naive[bivalent_genes_25$naive %in% consensusGenes]), length(setdiff(consensusGenes, bivalent_genes_25$naive)), length(enzymes[[i]]), lower.tail = FALSE))
+  
+  metagene_plot(metagene(naive, tss_range, enzymes[[i]]), title = paste0("Naive cells at naive genes with ", i), legend_overlap = T, title_overlap = F)
+  #metagene_plot(metagene(primed, tss_range, enzymes[[i]]), title = paste0("Primed cells at naive genes with ", i))
+  #metagene_plot(metagene(npc, tss_range, enzymes[[i]]), title = paste0("NPC cells at naive genes with ", i))
+  
+  naive_not_i = setdiff(consensusGenes, enzymes[[i]])
+  metagene_plot(metagene(naive, tss_range, naive_not_i), title = paste0("Naive cells at naive genes without ", i), legend_overlap = T, title_overlap = F)
+  #metagene_plot(metagene(primed, tss_range, naive_not_i), title = paste0("Primed cells at naive genes without ", i))
+  #metagene_plot(metagene(npc, tss_range, naive_not_i), title = paste0("NPC cells at naive genes without ", i))
+  
+  i_not_naive = setdiff(enzymes[[i]], bivalent_genes_25$naive)
+  #metagene_plot(metagene(naive, tss_range, i_not_naive), title = paste0("Naive cells at non-bivalent naive genes with ", i))
+  #metagene_plot(metagene(primed, tss_range, i_not_naive), title = paste0("Primed cells at non-bivalent naive genes with ", i))
+  #metagene_plot(metagene(npc, tss_range, i_not_naive), title = paste0("NPC cells at non-bivalent naive genes with ", i))
+  
+  rm(in_both, in_neither, only_enzymes, only_naive, naive_not_i)
+}
+
+```
+
 # Receiver Operator Characteristic Curves
 
 In this section, we will use our diffexp data frames to create receiver operator characteristic curves. As usual, we will first create functions; these will output the area under the curve.
@@ -1319,5 +1398,216 @@ heatmap_bivalent_biv = npc_summaries %>% filter(Gene %in% bivalent_loss_de) %>% 
 write.table(heatmap_bivalent_k4, "heatmaps/npc_heatmap_reverse_k4.tab", row.names = F, col.names = F)
 write.table(heatmap_bivalent_k27, "heatmaps/npc_heatmap_reverse_k27.tab", row.names = F, col.names = F)
 write.table(heatmap_bivalent_biv, "heatmaps/npc_heatmap_reverse_biv.tab", row.names = F, col.names = F)
+
+```
+
+And now we do that weird heatmap meta thing that Alex wants.
+
+```{r weird_heatmap}
+
+heatmap_bivalent_naive = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+heatmap_bivalent_primed = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(primed$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+heatmap_bivalent_npc = naive_summaries %>% filter(Gene %in% bivalent_genes_25$naive) %>% inner_join(npc$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_naive, "heatmaps/naive_heatmap_naive.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_primed, "heatmaps/naive_heatmap_primed.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_npc, "heatmaps/naive_heatmap_npc.tab", row.names = F, col.names = F)
+
+heatmap_bivalent_naive = primed_summaries %>% filter(Gene %in% setdiff(bivalent_genes_25$primed, bivalent_genes_25$naive)) %>% inner_join(naive$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+heatmap_bivalent_primed = primed_summaries %>% filter(Gene %in% setdiff(bivalent_genes_25$primed, bivalent_genes_25$naive)) %>% inner_join(primed$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+heatmap_bivalent_npc = primed_summaries %>% filter(Gene %in% setdiff(bivalent_genes_25$primed, bivalent_genes_25$naive)) %>% inner_join(npc$trans, by = "Gene") %>% select(X.3000:X3000) %>% mutate(across(.fns = ~ ifelse(.>100, 100, .))) %>% mutate(across(.fns = ~ ifelse(.<0, 0, .)))
+
+write.table(heatmap_bivalent_naive, "heatmaps/primed_heatmap_naive.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_primed, "heatmaps/primed_heatmap_primed.tab", row.names = F, col.names = F)
+write.table(heatmap_bivalent_npc, "heatmaps/primed_heatmap_npc.tab", row.names = F, col.names = F)
+
+```
+
+# scRNA-seq Analysis
+
+Here, we will try to associate bivalency with variability in scRNA-seq.
+
+```{r load_scrna_seq}
+
+metadata = data.frame(sample = dir("kallisto_quant")) %>% separate(sample, c("cell_type", "rep"), sep = "_STAR_RNA-seq_", remove = FALSE) %>% mutate(cell_type = ifelse(cell_type == "2i", "mESC_with2i", "mESC_no2i")) %>% mutate(path = file.path("kallisto_quant", sample))
+
+t2g = read.table("t2g.tab", header = T, stringsAsFactors = TRUE)
+
+sleuth_all = sleuth_prep(metadata, target_mapping = t2g, aggregation_column = 'ext_gene', extra_bootstrap_summary = TRUE)
+
+```
+
+This is a disaster to try to analyze on my desktop. I'm just going to get SD of log(tpm+1e-4) on the server and will load that in over here.
+
+```{r logtpm_sd_analysis}
+
+tpmsd = read.table("scrna_logtpm_sd.tab", header = T, stringsAsFactors = F)
+
+tpmsd_naive = tpmsd %>% filter(cell == "2i") %>% select(refseq_id, sdlogtpm) %>% filter(refseq_id %in% consensusGenes) %>% mutate(dom = ifelse(refseq_id %in% naive_dominance$k27, "k27", ifelse(refseq_id %in% naive_dominance$k4, "k4", ifelse(refseq_id %in% naive_dominance$mid, "mid", "none"))))
+tpmsd_primed = tpmsd %>% filter(cell == "mES") %>% select(refseq_id, sdlogtpm) %>% filter(refseq_id %in% consensusGenes) %>% mutate(dom = ifelse(refseq_id %in% primed_dominance$k27, "k27", ifelse(refseq_id %in% primed_dominance$k4, "k4", "none")))
+
+tpmsd_naive_gathered = tpmsd_naive %>% gather(key = "val", value = "sdlogtpm", -dom) %>% mutate(dom = as.factor(dom))
+tpmsd_primed_gathered = tpmsd_primed %>% gather(key = "gene", value = "sdlogtpm", -dom)
+
+```
+
+Now we'll do the proportion on analysis.
+
+```{r proportion_on}
+
+scrna_proportions = read.table("scrna_proportion.tab", stringsAsFactors = F)
+
+scrna_naive = scrna_proportions %>% filter(V2=="2i") %>% select(Gene = V1, prop = V3)
+naive_k4_scrna = hmds$naive %>% select(Gene, k4) %>% arrange(desc(k4)) %>% inner_join(scrna_naive, by = "Gene")
+k4_plot = data.frame(mod = "H3K4me3", hmd = colMeans(matrix(head(naive_k4_scrna$k4, n=42000), nrow = 4200)), prop = colMeans(matrix(head(naive_k4_scrna$prop, n = 42000), nrow = 4200)))
+
+naive_trans_scrna = hmds$naive %>% select(Gene, trans) %>% arrange(desc(trans)) %>% inner_join(scrna_naive, by = "Gene")
+trans_plot = data.frame(mod = "Bivalency", hmd = colMeans(matrix(head(naive_trans_scrna$trans, n=42000), nrow = 4200)), prop = colMeans(matrix(head(naive_trans_scrna$prop, n = 42000), nrow = 4200)))
+
+naive_k27_scrna = hmds$naive %>% select(Gene, k27) %>% arrange(desc(k27)) %>% inner_join(scrna_naive, by = "Gene")
+k27_plot = data.frame(mod = "H3K27me3", hmd = colMeans(matrix(head(naive_k27_scrna$k27, n=42000), nrow = 4200)), prop = colMeans(matrix(head(naive_k27_scrna$prop, n = 42000), nrow = 4200)))
+
+dataset = rbind(k4_plot, trans_plot, k27_plot)
+ggplot(data = dataset, aes(x = hmd, y = prop, fill = mod, color = mod)) + geom_point(size = 2) + geom_line() + theme_classic() + scale_x_continuous(name = "HMD (%)") + scale_y_continuous(name = "Prop. of cells transcribing") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black")) + theme(legend.position = 'None')
+
+rm(k4_plot, trans_plot, k27_plot)
+
+```
+
+Doing the same for bulk RNA and gene expression:
+
+```{r bulk_rna_expression}
+
+naive_k4 = hmds$naive %>% select(Gene, k4) %>% arrange(desc(k4)) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(Gene, k4, naive) %>% mutate(naive = log10(naive + 1e-4))
+k4_plot = data.frame(mod = "H3K4me3", hmd = colMeans(matrix(head(naive_k4$k4, n=42000), nrow = 4200)), logtpm = colMeans(matrix(head(naive_k4$naive, n = 42000), nrow = 4200)))
+
+naive_trans = hmds$naive %>% select(Gene, trans) %>% arrange(desc(trans)) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(Gene, trans, naive) %>% mutate(naive = log10(naive + 1e-4))
+trans_plot = data.frame(mod = "H3transme3", hmd = colMeans(matrix(head(naive_trans$trans, n=42000), nrow = 4200)), logtpm = colMeans(matrix(head(naive_trans$naive, n = 42000), nrow = 4200)))
+
+naive_k27 = hmds$naive %>% select(Gene, k27) %>% arrange(desc(k27)) %>% inner_join(gene_expression, by = c("Gene" = "refseq_id")) %>% select(Gene, k27, naive) %>% mutate(naive = log10(naive + 1e-4))
+k27_plot = data.frame(mod = "H3k27me3", hmd = colMeans(matrix(head(naive_k27$k27, n=42000), nrow = 4200)), logtpm = colMeans(matrix(head(naive_k27$naive, n = 42000), nrow = 4200)))
+
+dataset = rbind(k4_plot, trans_plot, k27_plot)
+ggplot(data = dataset, aes(x = hmd, y = logtpm, fill = mod, color = mod)) + geom_point(size = 2) + geom_line() + theme_classic() + scale_x_continuous(name = "HMD (%)") + scale_y_continuous(name = "Log(TPM + 1e-4)") + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black")) + theme(legend.position = 'None')
+
+rm(k4_plot, trans_plot, k27_plot)
+
+```
+
+# Alluvial diagram
+
+From naive to NPC.
+
+```{r alluvial}
+
+library(ggalluvial)
+
+alluvial_data = read.table("alluvial.txt", header = T)
+ggplot(alluvial_data, aes(y = number, axis1 = naive, axis2 = npc)) + geom_alluvium(aes(fill = naive), width = 1/6) + geom_stratum(width = 1/6) + theme_void() + theme(legend.position = 'None')
+
+alluvial_primed_data = read.table("alluvial_primed.txt", header = T)
+ggplot(alluvial_primed_data, aes(y = number, axis1 = primed, axis2 = npc)) + geom_alluvium(aes(fill = primed), width = 1/6) + geom_stratum(width = 1/6) + theme_void() + theme(legend.position = 'None')
+
+```
+# DNA Methylation
+
+Violin plot of dna methylation:
+
+```{r dna_methylation}
+
+methylation_naive_df = methyldata %>% select(Gene, prop = naive) %>% mutate(biv = ifelse(Gene %in% bivalent_genes_25$naive, "Bivalent", "Non-bivalent"))
+methylation_naive_plot = ggplot(data = methylation_naive_df, aes(x = biv, y = prop, fill = biv)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank(), legend.position = 'None') + scale_y_continuous(name = "DNA Methylation Proportion")
+
+methylation_primed_df = methyldata %>% select(Gene, prop = primed) %>% mutate(biv = ifelse(Gene %in% bivalent_genes_25$primed, "Bivalent", "Non-bivalent"))
+methylation_primed_plot = ggplot(data = methylation_primed_df, aes(x = biv, y = prop, fill = biv)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank(), legend.position = 'None') + scale_y_continuous(name = "DNA Methylation Proportion")
+
+methylation_df = rbind((methylation_naive_df %>% mutate(cell_type = "Naive mESCs")), (methylation_primed_df %>% mutate(cell_type = "Primed mESCs"))) %>% mutate(cell_type = as.factor(cell_type), biv = as.factor(biv))
+methylation_plot = ggplot(data = methylation_df, aes(x = cell_type, y = prop, fill = biv)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank(), legend.position = 'None') + scale_y_continuous(name = "DNA Methylation Proportion")
+
+```
+
+Now for CpG Islands:
+
+```{r cpg_islands}
+
+cpg_islands = read.table("mm10_promoters_cpg.tab", stringsAsFactors = F)$V4
+
+biv_cpg = hmds$naive %>% mutate(cpg = ifelse(Gene %in% cpg_islands, "CpG Isl.", "No CpG Isl.")) %>% select(trans, cpg)
+
+biv_cpg_plot = ggplot(data = biv_cpg, aes(x = cpg, y = trans)) + geom_violin() +  stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank(), legend.position = 'None') + scale_y_continuous(name = "HMD (%)")
+
+```
+
+# Breadth of H3K4me3, bivalency
+
+```{r breadth}
+
+breadth_k4 = data.frame(Gene = character(), upstream = numeric(), downstream = numeric(), bivalency = character())
+
+for (i in 1:length(naive$k4$Gene))
+{
+  if (naive$k4[i,62]>=25)
+  {
+    upstream_pos = ((naive$k4[i,2:62] %>% detect_index(.f = ~ .x < 25, .dir = "backward", .default = 1))-60)*50
+  }
+  else {
+    upstream_pos = ((naive$k4[i, 62:70] %>% detect_index(.f = ~ .x >= 25, .dir = "forward", .default = 1)) - 1)*50
+  }
+  
+  if (naive$k4[i,70]>=25)
+  {
+    downstream_pos = (naive$k4[i, 70:122] %>% detect_index(.f = ~ .x < 25, .dir = "forward", .default = 122))*50+350
+  }
+  else {
+    downstream_pos = ((naive$k4[i, 62:70] %>% detect_index(.f = ~ .x >= 25, .dir = "backward", .default = 1)) - 1)*50
+  }
+  
+  breadth_k4 = rbind(breadth_k4, data.frame(Gene = naive$k4$Gene[i], upstream = upstream_pos, downstream = downstream_pos, bivalency = ifelse(naive$k4$Gene[i] %in% bivalent_genes_25$naive, "Bivalent", "Non-Bivalent")))
+  
+  if (i %% 1000 == 0) {print(i)}
+}
+
+breadth_k4 = breadth_k4 %>% mutate(breadth = downstream - upstream)
+
+breadth_trans = data.frame(Gene = character(), upstream = numeric(), downstream = numeric(), bivalency = character())
+
+for (i in 1:length(naive$trans$Gene))
+{
+  if (naive$trans[i,62]>=25)
+  {
+    upstream_pos = ((naive$trans[i,2:62] %>% detect_index(.f = ~ .x < 25, .dir = "backward", .default = 1))-60)*50
+  }
+  else {
+    upstream_pos = ((naive$trans[i, 62:70] %>% detect_index(.f = ~ .x >= 25, .dir = "forward", .default = 1)) - 1)*50
+  }
+  
+  if (naive$trans[i,70]>=25)
+  {
+    downstream_pos = (naive$trans[i, 70:122] %>% detect_index(.f = ~ .x < 25, .dir = "forward", .default = 122))*50+350
+  }
+  else {
+    downstream_pos = ((naive$trans[i, 62:70] %>% detect_index(.f = ~ .x >= 25, .dir = "backward", .default = 1)) - 1)*50
+  }
+  
+  breadth_trans = rbind(breadth_trans, data.frame(Gene = naive$trans$Gene[i], upstream = upstream_pos, downstream = downstream_pos, bivalency = ifelse(naive$trans$Gene[i] %in% bivalent_genes_25$naive, "zBivalent", "Non-Bivalent")))
+  
+  if (i %% 1000 == 0) {print(i)}
+}
+
+breadth_trans = breadth_trans %>% filter(bivalency == "zBivalent") %>% mutate(breadth = downstream - upstream)
+
+print(ggplot(data = rbind(breadth_k4, breadth_trans), aes(x=bivalency, y = breadth)) + geom_violin() + stat_summary(fun=mean, geom="point", shape=23, size=2, fill = "black") + theme_classic() + geom_boxplot(fill = "white", width = 0.1) + scale_fill_manual(values = c("firebrick2", "royalblue2", "green3")) + theme(text = element_text(family = "sans", color = "black"), title = element_text(size = 10, color = "black"), axis.text = element_text(size = 10, color = "black"), axis.title = element_text(size = 10, color = "black"), axis.title.x = element_blank(), legend.position = 'None') + scale_y_continuous(name = "Breadth (bp)"))
+
+```
+
+# Autocorrelation
+
+```{r autocorrelation}
+
+nucdensities = naive$k4[,62:81] %>% rowwise() %>% mutate(nuc1 = mean(X0:X150), nuc2 = mean(X200:X350), nuc3 = mean(X400:X550), nuc4 = mean(X600:X750), nuc5 = mean(X800:X950)) %>% ungroup() %>% select(nuc1:nuc5)
+
+bivnucdensities = naive$trans[,62:81] %>% rowwise() %>% mutate(nuc1 = mean(X0:X150), nuc2 = mean(X200:X350), nuc3 = mean(X400:X550), nuc4 = mean(X600:X750), nuc5 = mean(X800:X950)) %>% ungroup() %>% select(nuc1:nuc5)
+
+k27nucdensities = naive$k27[,62:81] %>% rowwise() %>% mutate(nuc1 = mean(X0:X150), nuc2 = mean(X200:X350), nuc3 = mean(X400:X550), nuc4 = mean(X600:X750), nuc5 = mean(X800:X950)) %>% ungroup() %>% select(nuc1:nuc5)
 
 ```

@@ -37,3 +37,12 @@ vignettes/*.pdf
 rsconnect/
 
 kallisto_quant/
+
+plots/
+
+*.pdf
+
+*.tab
+*.txt
+heatmaps/
+hmts/
