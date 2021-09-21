@@ -32,13 +32,13 @@ h1 {
 }
 
 h2 {
-	color: #bf1300;
+	color: #800000;
 	font-weight: bold;
 	font-size: 24px;
 }
 
 h3 {
-	color: #bf1300;
+	color: #800000;
 	font-weight:normal;
 	font-size:24px;
 	margin-bottom: 10px;
@@ -190,7 +190,7 @@ a:hover, a:active, a:focus { /* this group of selectors will give a keyboard nav
 }
 
 .sidebar1 a:hover, .sidebar1 a:active, .sidebar1 a:focus, .dropdown-btn:hover { /* this changes the background and text color for both mouse and keyboard navigators */
-	color: #bf1300;
+	color: #800000;
 }
 
 .fa-caret-down {
